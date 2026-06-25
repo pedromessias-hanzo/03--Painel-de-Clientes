@@ -11,7 +11,7 @@ st.set_page_config(
     page_title="Hanzo do Brasil - Dashboard de Performance Comercial e Financeira",
     page_icon="📈",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # Load CSS Stylesheet
@@ -111,94 +111,25 @@ if not realized_months:
 last_realized_month = realized_months[-1]
 last_realized_month_pt = EN_TO_PT[last_realized_month]
 
-# Sidebar Panels
-with st.sidebar:
-    st.markdown('<div style="text-align: center; margin-bottom: 20px;">', unsafe_allow_html=True)
-    st.markdown("<h2 style='color:#002060; font-family: Outfit; font-weight:800; margin:0; border:none; padding:0;'>HANZO</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='color:#64748B; font-size:11px; font-weight:700; margin:0; text-transform:uppercase; letter-spacing:1.5px;'>Performance &amp; Projeções</p>", unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    # Spreadsheet Connection Status
-    st.markdown(
-        f"<div style='font-size: 11px; color: #64748B; line-height: 1.4;'>"
-        f"🟢 Planilha conectada e monitorada.<br>"
-        f"Última alteração: {last_modified.strftime('%d/%m/%Y %H:%M:%S')}"
-        f"</div>",
-        unsafe_allow_html=True
-    )
-    
-    if st.button("🔄 Atualizar Dados"):
-        st.cache_data.clear()
-        st.rerun()
-        
-    st.markdown("---")
-    st.markdown("<h4 style='font-family: Outfit; font-weight: 600; margin-bottom:10px;'>Filtros Globais</h4>", unsafe_allow_html=True)
-    
-    # 1. Year Filter
-    years = ["2026", "2025", "2027", "2028"]
-    selected_year = st.selectbox("Ano de Análise", years, index=0)
-    
-    # 2. Month Filter (Only active when Year is 2026)
-    if selected_year == "2026":
-        month_options = ["Todos", f"Acumulado até {last_realized_month_pt}"] + PT_MONTHS
-        selected_month_label = st.selectbox("Mês de Referência", month_options, index=1)
-    else:
-        st.info("Visualização anual completa para anos sem histórico mensal.")
-        selected_month_label = "Todos"
-        
-    # 3. Client Status Filter
-    statuses = ["Todos", "Ativo", "Novo Cliente", "Pipeline", "Wish List"]
-    selected_status = st.selectbox("Status Comercial", statuses, index=0)
-    
-    # 4. Client Group Filter
-    groups = ["Todos", "Grupo Alife Nino", "Grupo Bold", "Grupo Drumattos", "Independente"]
-    selected_group = st.selectbox("Grupo de Clientes", groups, index=0)
-    
-    # 5. Client Dropdown Filter
-    client_list = sorted(list(clients_metadata.keys()))
-    
-    # Apply status and group filters to client list in dropdown
-    filtered_dropdown_clients = []
-    for c in client_list:
-        status_match = (selected_status == "Todos" or clients_metadata[c]["status"] == selected_status)
-        group_match = (selected_group == "Todos" or clients_metadata[c]["group"] == selected_group)
-        if status_match and group_match:
-            filtered_dropdown_clients.append(c)
-            
-    selected_client_label = st.selectbox("Filtrar Cliente Específico", ["Todos"] + filtered_dropdown_clients, index=0)
+# HEADER, NAVIGATION & FILTERS REDESIGN (No Sidebar)
+tabs_nav = [
+    "🏛 Presidency Overview",
+    "🏆 Client Rankings",
+    "📉 Detractors",
+    "📈 Forecast & Budget",
+    "🎯 Strategic Matrix",
+    "🎯 Strategic Matrix", # Wait, why is it duplicated? Let's check: in tabs_nav there should only be one "🎯 Strategic Matrix". Yes, let's write it down correctly:
+    "🏛 Presidency Overview",
+    "🏆 Client Rankings",
+    "📉 Detractors",
+    "📈 Forecast & Budget",
+    "🎯 Strategic Matrix",
+    "⚠ Risks & Opportunities",
+    "👤 Client 360",
+    "👔 Board & Investors"
+]
 
-# Apply global filters to determine the final set of clients
-filtered_clients = []
-for c in client_list:
-    status_match = (selected_status == "Todos" or clients_metadata[c]["status"] == selected_status)
-    group_match = (selected_group == "Todos" or clients_metadata[c]["group"] == selected_group)
-    client_match = (selected_client_label == "Todos" or c == selected_client_label)
-    
-    if status_match and group_match and client_match:
-        filtered_clients.append(c)
-
-# Helper function to get list of months based on month filter
-def get_analysis_months(month_filter):
-    if month_filter == "Todos":
-        return EN_MONTHS
-    elif "Acumulado" in month_filter:
-        # Accumulate up to the last realized month (e.g. Jan-Jun)
-        idx = EN_MONTHS.index(last_realized_month)
-        return EN_MONTHS[:idx+1]
-    else:
-        # Single month
-        return [PT_TO_EN[month_filter]]
-
-analysis_months = get_analysis_months(selected_month_label)
-
-# Determine if the period is YTD (Accumulated) or full year
-is_ytd = "Acumulado" in selected_month_label
-is_single_month = selected_month_label in PT_MONTHS
-is_full_year = selected_month_label == "Todos"
-
-# Navigation Redesign
+# Wait, let's write clean tabs_nav:
 tabs_nav = [
     "🏛 Presidency Overview",
     "🏆 Client Rankings",
@@ -224,11 +155,11 @@ OLD_TO_NEW_MAP = {
 def clean_nav_name(name):
     return name.replace("🏛 ", "").replace("🏆 ", "").replace("📉 ", "").replace("📈 ", "").replace("🎯 ", "").replace("⚠ ", "").replace("👤 ", "").replace("👔 ", "").strip()
 
+# Resolve selected tab index
 default_index = 0
 try:
     if "page" in st.query_params:
         qp_page = st.query_params["page"].strip()
-        # Check old map first
         if qp_page in OLD_TO_NEW_MAP:
             qp_page = OLD_TO_NEW_MAP[qp_page]
         for idx, tab in enumerate(tabs_nav):
@@ -249,7 +180,116 @@ except:
     except:
         pass
 
-selected_tab = st.sidebar.radio("Navegação Principal", tabs_nav, index=default_index)
+if "selected_tab" not in st.session_state:
+    st.session_state.selected_tab = tabs_nav[default_index]
+else:
+    # Sync if query params change
+    if "page" in st.query_params:
+        qp_page = st.query_params["page"].strip()
+        for tab in tabs_nav:
+            if clean_nav_name(tab) == clean_nav_name(qp_page) or tab == qp_page:
+                st.session_state.selected_tab = tab
+                break
+
+selected_tab = st.session_state.selected_tab
+
+# Top Header Row (Logo, status, reload button)
+col_h1, col_h2, col_h3 = st.columns([4, 6, 2])
+with col_h1:
+    st.markdown(
+        "<div style='padding-top: 5px;'><h2 style='color:#002060; font-family: Outfit; font-weight:800; margin:0; border:none; padding:0;'>HANZO DO BRASIL</h2>"
+        "<p style='color:#64748B; font-size:11px; font-weight:700; margin:0; text-transform:uppercase; letter-spacing:1.5px;'>Performance &amp; Projeções</p></div>",
+        unsafe_allow_html=True
+    )
+with col_h2:
+    st.markdown(
+        f"<div style='font-size: 11px; color: #64748B; line-height: 1.4; padding-top: 18px; text-align: right;'>"
+        f"🟢 Planilha conectada e monitorada | "
+        f"Última alteração: {last_modified.strftime('%d/%m/%Y %H:%M:%S')}"
+        f"</div>",
+        unsafe_allow_html=True
+    )
+with col_h3:
+    if st.button("🔄 Atualizar Dados", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
+
+st.markdown("<hr style='margin: 10px 0 15px 0;'>", unsafe_allow_html=True)
+
+# Top Horizontal Navigation Bar
+nav_cols = st.columns(len(tabs_nav))
+for idx, tab in enumerate(tabs_nav):
+    is_active = (tab == selected_tab)
+    btn_type = "primary" if is_active else "secondary"
+    if nav_cols[idx].button(tab, key=f"top_nav_btn_{idx}", use_container_width=True, type=btn_type):
+        st.query_params["page"] = clean_nav_name(tab)
+        st.session_state.selected_tab = tab
+        st.rerun()
+
+st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
+
+# Horizontal Global Filters Bar
+with st.expander("🛠️ Filtros de Análise (Filtros Globais)", expanded=True):
+    col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns(5)
+    
+    with col_f1:
+        years = ["2026", "2025", "2027", "2028"]
+        selected_year = st.selectbox("Ano de Análise", years, index=0)
+        
+    with col_f2:
+        if selected_year == "2026":
+            month_options = ["Todos", f"Acumulado até {last_realized_month_pt}"] + PT_MONTHS
+            selected_month_label = st.selectbox("Mês de Referência", month_options, index=1)
+        else:
+            st.info("Visualização anual completa")
+            selected_month_label = "Todos"
+            
+    with col_f3:
+        statuses = ["Todos", "Ativo", "Novo Cliente", "Pipeline", "Wish List"]
+        selected_status = st.selectbox("Status Comercial", statuses, index=0)
+        
+    with col_f4:
+        groups = ["Todos", "Grupo Alife Nino", "Grupo Bold", "Grupo Drumattos", "Independente"]
+        selected_group = st.selectbox("Grupo de Clientes", groups, index=0)
+        
+    with col_f5:
+        # Pre-filter client list for dropdown selection
+        client_list = sorted(list(clients_metadata.keys()))
+        filtered_dropdown_clients = []
+        for c in client_list:
+            status_match = (selected_status == "Todos" or clients_metadata[c]["status"] == selected_status)
+            group_match = (selected_group == "Todos" or clients_metadata[c]["group"] == selected_group)
+            if status_match and group_match:
+                filtered_dropdown_clients.append(c)
+                
+        selected_client_label = st.selectbox("Cliente Específico", ["Todos"] + filtered_dropdown_clients, index=0)
+
+# Apply global filters to determine the final set of clients
+filtered_clients = []
+for c in client_list:
+    status_match = (selected_status == "Todos" or clients_metadata[c]["status"] == selected_status)
+    group_match = (selected_group == "Todos" or clients_metadata[c]["group"] == selected_group)
+    client_match = (selected_client_label == "Todos" or c == selected_client_label)
+    
+    if status_match and group_match and client_match:
+        filtered_clients.append(c)
+
+# Helper function to get list of months based on month filter
+def get_analysis_months(month_filter):
+    if month_filter == "Todos":
+        return EN_MONTHS
+    elif "Acumulado" in month_filter:
+        idx = EN_MONTHS.index(last_realized_month)
+        return EN_MONTHS[:idx+1]
+    else:
+        return [PT_TO_EN[month_filter]]
+
+analysis_months = get_analysis_months(selected_month_label)
+
+# Determine if the period is YTD (Accumulated) or full year
+is_ytd = "Acumulado" in selected_month_label
+is_single_month = selected_month_label in PT_MONTHS
+is_full_year = selected_month_label == "Todos"
 
 # Pre-calculate YTD / Full Year Metrics for 2026 (Base vs Real vs Optimistic)
 # We calculate values based on filtered_clients and analysis_months
@@ -506,10 +546,10 @@ prob_atingimento = "ALTA" if rec_var_pct >= 0 else "MODERADA" if rec_var_pct >= 
 yoy_gmv_growth = (sum(overview_data[c]['2026']['GMV'] for c in filtered_clients if c in overview_data) - kpi_data["gmv_2025"]) / kpi_data["gmv_2025"] if kpi_data["gmv_2025"] > 0 else 0.0
 yoy_rec_growth = (sum(overview_data[c]['2026']['Receita Hanzo'] for c in filtered_clients if c in overview_data) - kpi_data["rec_2025"]) / kpi_data["rec_2025"] if kpi_data["rec_2025"] > 0 else 0.0
 
-# HTML Generators for Executive Leaderboard
+# HTML Generators for Executive Leaderboard (Simplified to 5 columns)
 def generate_revenue_ranking_html(data_list):
     html = "<div class='executive-table-container'><table class='executive-table'><thead><tr>"
-    html += "<th>Rk</th><th>Cliente</th><th class='numeric'>Receita</th><th class='numeric'>Share</th><th class='numeric'>MoM</th><th class='numeric'>YoY</th><th>St</th>"
+    html += "<th>Rank</th><th>Cliente</th><th class='numeric'>Receita</th><th class='numeric'>Share</th><th style='text-align:center;'>Status</th>"
     html += "</tr></thead><tbody>"
     for idx, row in enumerate(data_list):
         status_badge = get_client_status_badge(row['achievement'])
@@ -518,8 +558,6 @@ def generate_revenue_ranking_html(data_list):
         html += f"<td><b>{row['client']}</b></td>"
         html += f"<td class='numeric'>R$ {row['revenue']:,.0f}</td>"
         html += f"<td class='numeric'>{row['share']*100:.1f}%</td>"
-        html += f"<td class='numeric' style='color:{'#16A34A' if row['mom']>=0 else '#DC2626'}'>{row['mom']*100:+.1f}%</td>"
-        html += f"<td class='numeric' style='color:{'#16A34A' if row['yoy']>=0 else '#DC2626'}'>{row['yoy']*100:+.1f}%</td>"
         html += f"<td style='text-align:center;'>{status_badge}</td>"
         html += f"</tr>"
     html += "</tbody></table></div>"
@@ -527,7 +565,7 @@ def generate_revenue_ranking_html(data_list):
 
 def generate_gmv_ranking_html(data_list):
     html = "<div class='executive-table-container'><table class='executive-table'><thead><tr>"
-    html += "<th>Rk</th><th>Cliente</th><th class='numeric'>GMV</th><th class='numeric'>Share</th><th class='numeric'>MoM</th><th class='numeric'>YoY</th><th>St</th>"
+    html += "<th>Rank</th><th>Cliente</th><th class='numeric'>GMV</th><th class='numeric'>Share</th><th style='text-align:center;'>Status</th>"
     html += "</tr></thead><tbody>"
     for idx, row in enumerate(data_list):
         status_badge = get_client_status_badge(row['achievement'])
@@ -536,8 +574,6 @@ def generate_gmv_ranking_html(data_list):
         html += f"<td><b>{row['client']}</b></td>"
         html += f"<td class='numeric'>R$ {row['gmv']:,.0f}</td>"
         html += f"<td class='numeric'>{row['share']*100:.1f}%</td>"
-        html += f"<td class='numeric' style='color:{'#16A34A' if row['mom']>=0 else '#DC2626'}'>{row['mom']*100:+.1f}%</td>"
-        html += f"<td class='numeric' style='color:{'#16A34A' if row['yoy']>=0 else '#DC2626'}'>{row['yoy']*100:+.1f}%</td>"
         html += f"<td style='text-align:center;'>{status_badge}</td>"
         html += f"</tr>"
     html += "</tbody></table></div>"
@@ -545,7 +581,7 @@ def generate_gmv_ranking_html(data_list):
 
 def generate_budget_ranking_html(data_list):
     html = "<div class='executive-table-container'><table class='executive-table'><thead><tr>"
-    html += "<th>Rk</th><th>Cliente</th><th class='numeric'>Meta %</th><th class='numeric'>Desvio</th><th>St</th>"
+    html += "<th>Rank</th><th>Cliente</th><th class='numeric'>Diferença</th><th class='numeric'>Atingimento</th><th style='text-align:center;'>Status</th>"
     html += "</tr></thead><tbody>"
     for idx, row in enumerate(data_list):
         status_badge = get_client_status_badge(row['achievement'])
@@ -553,8 +589,8 @@ def generate_budget_ranking_html(data_list):
         html += f"<tr>"
         html += f"<td>{idx+1}</td>"
         html += f"<td><b>{row['client']}</b></td>"
-        html += f"<td class='numeric' style='font-weight:700;'>{row['achievement']*100:.1f}%</td>"
         html += f"<td class='numeric' style='color:{dev_color}'>R$ {row['diff']:+,.0f}</td>"
+        html += f"<td class='numeric' style='font-weight:700;'>{row['achievement']*100:.1f}%</td>"
         html += f"<td style='text-align:center;'>{status_badge}</td>"
         html += f"</tr>"
     html += "</tbody></table></div>"
@@ -1886,20 +1922,16 @@ elif selected_tab == "⚠ Risks & Opportunities":
 elif selected_tab == "👤 Client 360":
     st.markdown(
         f"<div class='title-container'>"
-        f"<h1>Client Performance Sheet — Visão 360°</h1>"
-        f"<p>Deep-dive Executivo e Ficha do Cliente — Foco em Performance, Metas e Risco</p>"
+        f"<h1>Executive Client Scorecard — Visão 360°</h1>"
+        f"<p>Resumo Gerencial e Acompanhamento de Metas de Clientes para Tomada de Decisão Rápida</p>"
         f"</div>",
         unsafe_allow_html=True
     )
     
-    selected_c = st.selectbox("Selecione o Cliente para Análise Completa", filtered_dropdown_clients)
+    selected_c = st.selectbox("Selecione o Cliente para Análise Executiva", filtered_dropdown_clients)
     
     if selected_c:
-        # Load 360 details
-        c_status = clients_metadata[selected_c]["status"]
-        c_group = clients_metadata[selected_c]["group"]
-        
-        # Calculate YTD values and achievements
+        # 1. Gather YTD values
         c_rec_real = client_revenue_vals[selected_c]
         c_rec_plan = c_rec_real - client_diffs[selected_c]
         c_gmv_real = client_gmv_vals[selected_c]
@@ -1907,138 +1939,237 @@ elif selected_tab == "👤 Client 360":
         c_ped_real = client_ped_vals[selected_c]
         c_ped_plan = sum(monthly_data[selected_c]["Pedidos"]["plan"].get(m, 0.0) for m in analysis_months) if selected_c in monthly_data else 0.0
         
+        # Calculate achievements
+        gmv_ach = c_gmv_real / c_gmv_plan * 100 if c_gmv_plan > 0 else 100.0
+        rec_ach = c_rec_real / c_rec_plan * 100 if c_rec_plan > 0 else 100.0
+        ped_ach = c_ped_real / c_ped_plan * 100 if c_ped_plan > 0 else 100.0
         score = client_scores[selected_c]
-        status_badge = get_client_status_badge(client_achievements[selected_c])
         
-        # Header scorecard summary card
-        col_c1, col_c2, col_c3 = st.columns(3)
-        with col_c1:
-            st.markdown(
-                f"<div class='metric-card accent-blue'>"
-                f"<div class='metric-card-title'>Score de Performance YTD</div>"
-                f"<div class='metric-card-value'>{score:.1f} pts</div>"
-                f"<div class='metric-card-delta delta-neutral'>Índice Consolidado Multidimensional</div>"
-                f"</div>",
-                unsafe_allow_html=True
-            )
-        with col_c2:
-            st.markdown(
-                f"<div class='metric-card accent-green' style='border-left-color: {'#16A34A' if score >= 100 else '#D97706' if score >= 90 else '#DC2626'} !important;'>"
-                f"<div class='metric-card-title'>Status da Conta</div>"
-                f"<div class='metric-card-value'>{status_badge} {'Top Performer' if score >= 100 else 'Average Performer' if score >= 90 else 'Underperformer'}</div>"
-                f"<div class='metric-card-delta delta-neutral'>Comportamento vs Plano</div>"
-                f"</div>",
-                unsafe_allow_html=True
-            )
-        with col_c3:
-            # Client quadrant from page 5
-            # Determine classification
-            rev_2026_ov = overview_data.get(selected_c, {}).get("2026", {}).get("Receita Hanzo", 0.0)
-            rev_2025_ov = overview_data.get(selected_c, {}).get("2025", {}).get("Receita Hanzo", 0.0)
-            growth_ov = (rev_2026_ov - rev_2025_ov) / rev_2025_ov if rev_2025_ov > 0 else 0.0
-            
-            if rev_2026_ov >= 100000.0:
-                classification = "Strategic" if growth_ov >= 0.05 else "At Risk"
+        # Helper for traffic light
+        def get_attainment_traffic_light(pct):
+            if pct >= 95.0:
+                return "🟢"
+            elif pct >= 90.0:
+                return "🟡"
             else:
-                classification = "Expansion" if growth_ov >= 0.05 else "Low Priority"
+                return "🔴"
                 
-            accent_class = "accent-green" if classification in ["Strategic", "Expansion"] else "accent-red"
-            st.markdown(
-                f"<div class='metric-card {accent_class}'>"
-                f"<div class='metric-card-title'>Matriz Estratégica</div>"
-                f"<div class='metric-card-value'>{classification}</div>"
-                f"<div class='metric-card-delta delta-neutral'>Quadrante de Portfólio</div>"
-                f"</div>",
-                unsafe_allow_html=True
-            )
-            
-        # Detailed Client Performance Sheet
-        col_sh1, col_sh2 = st.columns(2)
+        # SECTION 1: Executive Summary (4 KPI Cards)
+        st.markdown("### 🏛️ Sumário Executivo")
+        col_c1, col_c2, col_c3, col_c4 = st.columns(4)
         
-        with col_sh1:
-            st.markdown("### 🏛️ Histórico de Metas Consolidadas")
-            c_annual = overview_data.get(selected_c, {})
-            if c_annual:
-                html_ann = "<div class='executive-table-container'><table class='executive-table'><thead><tr>"
-                html_ann += "<th>Ano</th><th class='numeric'>GMV</th><th class='numeric'>Pedidos</th><th class='numeric'>Receita Hanzo</th><th class='numeric'>Take Rate</th>"
-                html_ann += "</tr></thead><tbody>"
-                for yr in ["2025", "2026", "2027", "2028"]:
-                    gm = c_annual[yr]['GMV']
-                    rec = c_annual[yr]['Receita Hanzo']
-                    ped = c_annual[yr]['Pedidos']
-                    tr = rec / gm if gm > 0 else 0.0
-                    html_ann += f"<tr>"
-                    html_ann += f"<td><b>{yr}</b></td>"
-                    html_ann += f"<td class='numeric'>R$ {gm:,.0f}</td>"
-                    html_ann += f"<td class='numeric'>{ped:,.0f}</td>"
-                    html_ann += f"<td class='numeric'>R$ {rec:,.0f}</td>"
-                    html_ann += f"<td class='numeric'>{tr*100:.2f}%</td>"
-                    html_ann += f"</tr>"
-                html_ann += "</tbody></table></div>"
-                st.markdown(html_ann, unsafe_allow_html=True)
+        # Card 1: GMV
+        col_c1.markdown(
+            f"<div style='border: 1px solid #E2E8F0; padding: 15px; border-radius: 6px; background-color:#FFFFFF;'>"
+            f"<div style='font-size: 11px; color: #64748B; font-weight: 700; text-transform: uppercase;'>GMV Realizado YTD</div>"
+            f"<div style='font-size: 18px; font-weight: 800; color: #002060; margin: 5px 0;'>R$ {c_gmv_real:,.2f}</div>"
+            f"<div style='font-size: 13px; font-weight: 700;'>Meta: {gmv_ach:.1f}% {get_attainment_traffic_light(gmv_ach)}</div>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+        
+        # Card 2: Revenue
+        col_c2.markdown(
+            f"<div style='border: 1px solid #E2E8F0; padding: 15px; border-radius: 6px; background-color:#FFFFFF;'>"
+            f"<div style='font-size: 11px; color: #64748B; font-weight: 700; text-transform: uppercase;'>Receita Hanzo YTD</div>"
+            f"<div style='font-size: 18px; font-weight: 800; color: #002060; margin: 5px 0;'>R$ {c_rec_real:,.2f}</div>"
+            f"<div style='font-size: 13px; font-weight: 700;'>Meta: {rec_ach:.1f}% {get_attainment_traffic_light(rec_ach)}</div>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+        
+        # Card 3: Orders
+        col_c3.markdown(
+            f"<div style='border: 1px solid #E2E8F0; padding: 15px; border-radius: 6px; background-color:#FFFFFF;'>"
+            f"<div style='font-size: 11px; color: #64748B; font-weight: 700; text-transform: uppercase;'>Pedidos Realizados YTD</div>"
+            f"<div style='font-size: 18px; font-weight: 800; color: #002060; margin: 5px 0;'>{c_ped_real:,.0f}</div>"
+            f"<div style='font-size: 13px; font-weight: 700;'>Meta: {ped_ach:.1f}% {get_attainment_traffic_light(ped_ach)}</div>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+        
+        # Card 4: Budget Achievement
+        col_c4.markdown(
+            f"<div style='border: 1px solid #E2E8F0; padding: 15px; border-radius: 6px; background-color:#FFFFFF;'>"
+            f"<div style='font-size: 11px; color: #64748B; font-weight: 700; text-transform: uppercase;'>Budget Achievement</div>"
+            f"<div style='font-size: 18px; font-weight: 800; color: #002060; margin: 5px 0;'>{score:.1f}%</div>"
+            f"<div style='font-size: 13px; font-weight: 700;'>Status Geral: {score:.1f}% {get_attainment_traffic_light(score)}</div>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+        
+        st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
+        
+        # Two-column layout for the matrices and cards
+        col_sec1, col_sec2 = st.columns([7, 5])
+        
+        with col_sec1:
+            # SECTION 2: Performance Matrix
+            st.markdown("### 📊 Matriz de Performance (Plan vs Actual)")
+            matrix_html = f"""
+            <div class='executive-table-container'>
+                <table class='executive-table'>
+                    <thead>
+                        <tr>
+                            <th>Métrica</th>
+                            <th class='numeric'>Budget (Orçado)</th>
+                            <th class='numeric'>Actual (Realizado)</th>
+                            <th class='numeric'>Atingimento %</th>
+                            <th style='text-align:center;'>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><b>GMV</b></td>
+                            <td class='numeric'>R$ {c_gmv_plan:,.2f}</td>
+                            <td class='numeric'>R$ {c_gmv_real:,.2f}</td>
+                            <td class='numeric' style='font-weight:700;'>{gmv_ach:.1f}%</td>
+                            <td style='text-align:center;'>{get_attainment_traffic_light(gmv_ach)}</td>
+                        </tr>
+                        <tr>
+                            <td><b>Receita Hanzo</b></td>
+                            <td class='numeric'>R$ {c_rec_plan:,.2f}</td>
+                            <td class='numeric'>R$ {c_rec_real:,.2f}</td>
+                            <td class='numeric' style='font-weight:700;'>{rec_ach:.1f}%</td>
+                            <td style='text-align:center;'>{get_attainment_traffic_light(rec_ach)}</td>
+                        </tr>
+                        <tr>
+                            <td><b>Volume de Pedidos</b></td>
+                            <td class='numeric'>{c_ped_plan:,.0f}</td>
+                            <td class='numeric'>{c_ped_real:,.0f}</td>
+                            <td class='numeric' style='font-weight:700;'>{ped_ach:.1f}%</td>
+                            <td style='text-align:center;'>{get_attainment_traffic_light(ped_ach)}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            """
+            st.markdown(matrix_html, unsafe_allow_html=True)
+            
+            # SECTION 3: GMV Budget Adherence
+            st.markdown("### 🎯 Aderência ao Orçamento de GMV")
+            filled_blocks = max(0, min(20, int(round(gmv_ach / 5.0))))
+            empty_blocks = 20 - filled_blocks
+            bar_str = "█" * filled_blocks + "░" * empty_blocks
+            
+            status_label = "Sucesso" if gmv_ach >= 95.0 else "Atenção" if gmv_ach >= 90.0 else "Desvio Crítico"
+            status_emoji = get_attainment_traffic_light(gmv_ach)
+            
+            adherence_html = f"""
+            <div style='border: 1px solid #E2E8F0; padding: 20px; border-radius: 6px; background-color:#FFFFFF; line-height: 1.4;'>
+                <div style='display: flex; justify-content: space-between; margin-bottom: 12px;'>
+                    <div>
+                        <span style='font-size: 11px; color: #64748B; font-weight: 700;'>BUDGET GMV</span><br>
+                        <span style='font-size: 15px; font-weight: 800; color: #334155;'>R$ {c_gmv_plan:,.0f}</span>
+                    </div>
+                    <div>
+                        <span style='font-size: 11px; color: #64748B; font-weight: 700;'>ACTUAL GMV</span><br>
+                        <span style='font-size: 15px; font-weight: 800; color: #334155;'>R$ {c_gmv_real:,.0f}</span>
+                    </div>
+                    <div style='text-align: right;'>
+                        <span style='font-size: 11px; color: #64748B; font-weight: 700;'>STATUS ADERÊNCIA</span><br>
+                        <span style='font-size: 15px; font-weight: 800; color: #334155;'>{status_emoji} {status_label} ({gmv_ach:.1f}%)</span>
+                    </div>
+                </div>
+                <div style='font-family: monospace; font-size: 20px; color: #002060; letter-spacing: 2px; line-height: 1; word-break: break-all;'>
+                    {bar_str}
+                </div>
+            </div>
+            """
+            st.markdown(adherence_html, unsafe_allow_html=True)
+            
+        with col_sec2:
+            # SECTION 4: Client Ranking Position
+            st.markdown("### 🏆 Posição no Portfólio")
+            all_client_revs = {}
+            for c in filtered_clients:
+                all_client_revs[c] = client_revenue_vals[c]
+            sorted_revs = sorted(all_client_revs.items(), key=lambda x: x[1], reverse=True)
+            client_rank = 1
+            for idx, (name, val) in enumerate(sorted_revs):
+                if name == selected_c:
+                    client_rank = idx + 1
+                    break
+            total_ytd_revenue = sum(all_client_revs.values())
+            client_rev_share = client_revenue_vals[selected_c] / total_ytd_revenue if total_ytd_revenue > 0 else 0.0
+            
+            def get_rank_suffix(r):
+                if r == 1:
+                    return "1º Maior Cliente"
+                elif r == 2:
+                    return "2º Maior Cliente"
+                elif r == 3:
+                    return "3º Maior Cliente"
+                else:
+                    return f"{r}º Maior Cliente"
+            
+            portfolio_position_desc = get_rank_suffix(client_rank)
+            
+            rank_card_html = f"""
+            <div style='border: 1px solid #E2E8F0; padding: 15px; border-radius: 6px; background-color:#FFFFFF; text-align: center;'>
+                <div style='font-size: 18px; font-weight: 800; color: #002060;'>{portfolio_position_desc}</div>
+                <div style='font-size: 11px; color: #64748B; font-weight: 700; text-transform: uppercase; margin-top: 8px;'>REVENUE SHARE YTD</div>
+                <div style='font-size: 24px; font-weight: 800; color: #16A34A; margin-top: 3px;'>{client_rev_share*100:.1f}%</div>
+            </div>
+            """
+            st.markdown(rank_card_html, unsafe_allow_html=True)
+            
+            # SECTION 7: CFO Insights (Portuguese, concise, <=3 bullets)
+            st.markdown("### 💡 Executive CFO Insights")
+            c_tr_real = c_rec_real / c_gmv_real * 100 if c_gmv_real > 0 else 0.0
+            c_tr_plan = c_rec_plan / c_gmv_plan * 100 if c_gmv_plan > 0 else 0.0
+            rec_diff = client_diffs[selected_c]
+            
+            bullet_1 = f"GMV acumulado está {abs(gmv_ach - 100):.1f}% {'acima' if gmv_ach >= 100 else 'abaixo'} do orçamento."
+            bullet_2 = f"Take Rate médio realizado é de {c_tr_real:.2f}% (versus {c_tr_plan:.2f}% orçado)."
+            
+            if score < 90.0:
+                bullet_3 = f"Ação comercial de urgência necessária devido ao desvio crítico de -R$ {abs(rec_diff):,.0f}."
+            elif score < 100.0:
+                bullet_3 = "Recomenda-se monitorar de perto os volumes para atingir 100% da meta de receita anual."
             else:
-                st.warning("Sem dados históricos na aba Overview.")
+                bullet_3 = "Conta saudável. Avaliar oportunidades de upsell e renovação antecipada."
                 
-            st.markdown("### 📊 Participação e Representatividade no Portfólio")
-            rec_share_ytd = c_rec_real / total_ytd_revenue if total_ytd_revenue > 0 else 0.0
-            gmv_share_ytd = c_gmv_real / total_ytd_gmv if total_ytd_gmv > 0 else 0.0
+            insights_html = f"""
+            <div style='border: 1px solid #E2E8F0; padding: 15px; border-radius: 6px; background-color:#FFFFFF;'>
+                <ul style='font-family: Inter; font-size: 12px; color: #334155; line-height: 1.5; margin: 0; padding-left: 15px;'>
+                    <li style='margin-bottom:6px;'>{bullet_1}</li>
+                    <li style='margin-bottom:6px;'>{bullet_2}</li>
+                    <li style='margin-bottom:0;'>{bullet_3}</li>
+                </ul>
+            </div>
+            """
+            st.markdown(insights_html, unsafe_allow_html=True)
             
-            html_share = "<div class='executive-table-container'><table class='executive-table'><thead><tr>"
-            html_share += "<th>Métrica</th><th class='numeric'>Volume Cliente YTD</th><th class='numeric'>Total Hanzo YTD</th><th class='numeric'>Share %</th>"
-            html_share += "</tr></thead><tbody>"
-            html_share += f"<tr><td><b>Receita Hanzo</b></td><td class='numeric'>R$ {c_rec_real:,.2f}</td><td class='numeric'>R$ {total_ytd_revenue:,.2f}</td><td class='numeric' style='font-weight:700;'>{rec_share_ytd*100:.2f}%</td></tr>"
-            html_share += f"<tr><td><b>GMV Parceiro</b></td><td class='numeric'>R$ {c_gmv_real:,.2f}</td><td class='numeric'>R$ {total_ytd_gmv:,.2f}</td><td class='numeric' style='font-weight:700;'>{gmv_share_ytd*100:.2f}%</td></tr>"
-            html_share += "</tbody></table></div>"
-            st.markdown(html_share, unsafe_allow_html=True)
-            
-        with col_sh2:
-            st.markdown("### 🎯 Atingimento de Orçamento YTD (Plan vs Real)")
-            html_ach = "<div class='executive-table-container'><table class='executive-table'><thead><tr>"
-            html_ach += "<th>Métrica</th><th class='numeric'>Orçado (Plan)</th><th class='numeric'>Real (Actual)</th><th class='numeric'>Desvio</th><th class='numeric'>Var %</th>"
-            html_ach += "</tr></thead><tbody>"
-            
-            # Row for GMV
-            gmv_diff = c_gmv_real - c_gmv_plan
-            gmv_pct = gmv_diff / c_gmv_plan if c_gmv_plan > 0 else 0.0
-            html_ach += f"<tr><td><b>GMV</b></td><td class='numeric'>R$ {c_gmv_plan:,.0f}</td><td class='numeric'>R$ {c_gmv_real:,.0f}</td><td class='numeric' style='color:{'#16A34A' if gmv_diff>=0 else '#DC2626'}'>R$ {gmv_diff:+,.0f}</td><td class='numeric' style='color:{'#16A34A' if gmv_diff>=0 else '#DC2626'}'>{gmv_pct*100:+.2f}%</td></tr>"
-            
-            # Row for Revenue
-            rec_diff = c_rec_real - c_rec_plan
-            rec_pct = rec_diff / c_rec_plan if c_rec_plan > 0 else 0.0
-            html_ach += f"<tr><td><b>Receita Hanzo</b></td><td class='numeric'>R$ {c_rec_plan:,.0f}</td><td class='numeric'>R$ {c_rec_real:,.0f}</td><td class='numeric' style='color:{'#16A34A' if rec_diff>=0 else '#DC2626'}'>R$ {rec_diff:+,.0f}</td><td class='numeric' style='color:{'#16A34A' if rec_diff>=0 else '#DC2626'}'>{rec_pct*100:+.2f}%</td></tr>"
-            
-            # Row for Orders
-            ped_diff = c_ped_real - c_ped_plan
-            ped_pct = ped_diff / c_ped_plan if c_ped_plan > 0 else 0.0
-            html_ach += f"<tr><td><b>Pedidos</b></td><td class='numeric'>{c_ped_plan:,.0f}</td><td class='numeric'>{c_ped_real:,.0f}</td><td class='numeric' style='color:{'#16A34A' if ped_diff>=0 else '#DC2626'}'>{ped_diff:+,.0f}</td><td class='numeric' style='color:{'#16A34A' if ped_diff>=0 else '#DC2626'}'>{ped_pct*100:+.2f}%</td></tr>"
-            
-            html_ach += "</tbody></table></div>"
-            st.markdown(html_ach, unsafe_allow_html=True)
-            
-            st.markdown("### 📈 Forecast e Projeção Cenarizada (Fechamento 2026)")
-            if selected_c in monthly_data:
-                fy_base_rec = 0.0
-                for m in EN_MONTHS:
-                    if m in realized_months:
-                        fy_base_rec += monthly_data[selected_c]["Receita Hanzo"]["real"].get(m, 0.0)
-                    else:
-                        fy_base_rec += monthly_data[selected_c]["Receita Hanzo"]["plan"].get(m, 0.0)
+            # SECTION 6: Executive Action Card
+            st.markdown("### 📝 Recomendação Executiva")
+            if score >= 100.0:
+                if client_growth_yoy[selected_c] >= 0.05:
+                    recommendation = "🟢 Expand (Expandir)"
+                    rec_desc = "Faturamento robusto e crescimento forte. Buscar upsell comercial."
+                else:
+                    recommendation = "🟢 Maintain (Manter)"
+                    rec_desc = "Meta orçada atingida com consistência. Garantir nível de serviço."
+            elif score >= 90.0:
+                recommendation = "🟡 Monitor (Monitorar)"
+                rec_desc = "Desvios marginais identificados. Monitoramento mensal próximo recomendado."
             else:
-                fy_base_rec = overview_data.get(selected_c, {}).get("2026", {}).get("Receita Hanzo", 0.0)
+                recommendation = "🔴 Immediate Action Required"
+                rec_desc = "Desvios severos (abaixo de 90%). Ação corretiva imediata necessária."
                 
-            html_fc = "<div class='executive-table-container'><table class='executive-table'><thead><tr>"
-            html_fc += "<th>Cenário</th><th class='numeric'>Multiplicador</th><th class='numeric'>Projeção Receita EOY</th>"
-            html_fc += "</tr></thead><tbody>"
-            html_fc += f"<tr><td>Conservador</td><td class='numeric'>85%</td><td class='numeric'>R$ {fy_base_rec*0.85:,.2f}</td></tr>"
-            html_fc += f"<tr><td><b>Base (Orçado)</b></td><td class='numeric'>100%</td><td class='numeric'><b>R$ {fy_base_rec:,.2f}</b></td></tr>"
-            html_fc += f"<tr><td>Otimista</td><td class='numeric'>115%</td><td class='numeric'>R$ {fy_base_rec*1.15:,.2f}</td></tr>"
-            html_fc += "</tbody></table></div>"
-            st.markdown(html_fc, unsafe_allow_html=True)
+            recommendation_html = f"""
+            <div style='border: 1px solid #E2E8F0; padding: 15px; border-radius: 6px; background-color:#FFFFFF;'>
+                <div style='font-size: 14px; font-weight: 800; color: #0F172A;'>{recommendation}</div>
+                <div style='font-size: 11px; color: #64748B; margin-top: 4px;'>{rec_desc}</div>
+            </div>
+            """
+            st.markdown(recommendation_html, unsafe_allow_html=True)
             
-        # Monthly 2026 Plan vs Realized Charts (sparkline-like dashboard grid)
+        # SECTION 5: Simple Trend Charts (GMV, Revenue, Orders)
+        st.markdown("<hr style='margin: 20px 0 15px 0;'>", unsafe_allow_html=True)
+        st.markdown("### 📈 Evolução Mensal Comparativa (Metas vs Realizado)")
+        
         if selected_c in monthly_data:
-            st.markdown("### 📈 Evolução Mensal Comparativa de KPIs (Metas vs Realizado)")
-            
             c_mon_gmv_plan = [monthly_data[selected_c]["GMV"]["plan"].get(m, 0.0) for m in EN_MONTHS]
             c_mon_gmv_real = [monthly_data[selected_c]["GMV"]["real"].get(m, 0.0) if m in realized_months else None for m in EN_MONTHS]
             c_mon_rec_plan = [monthly_data[selected_c]["Receita Hanzo"]["plan"].get(m, 0.0) for m in EN_MONTHS]
@@ -2046,37 +2177,29 @@ elif selected_tab == "👤 Client 360":
             c_mon_ped_plan = [monthly_data[selected_c]["Pedidos"]["plan"].get(m, 0.0) for m in EN_MONTHS]
             c_mon_ped_real = [monthly_data[selected_c]["Pedidos"]["real"].get(m, 0.0) if m in realized_months else None for m in EN_MONTHS]
             
-            col_ch1, col_ch2 = st.columns(2)
+            col_ch1, col_ch2, col_ch3 = st.columns(3)
             pt_months_labels = [EN_TO_PT[m] for m in EN_MONTHS]
             
             with col_ch1:
-                fig_c_rec = go.Figure()
-                fig_c_rec.add_trace(go.Bar(x=pt_months_labels, y=c_mon_rec_plan, name="Meta Plan", marker_color="#E2E8F0"))
-                fig_c_rec.add_trace(go.Bar(x=pt_months_labels, y=c_mon_rec_real, name="Realizado Actual", marker_color="#002060"))
-                fig_c_rec.update_layout(title="Evolução de Receita Hanzo (R$)", plot_bgcolor="#FFFFFF", height=280, margin=dict(t=35, b=5, l=5, r=5), legend=dict(orientation="h", y=1.1))
-                st.plotly_chart(fig_c_rec, use_container_width=True)
-                
-                fig_c_ped = go.Figure()
-                fig_c_ped.add_trace(go.Bar(x=pt_months_labels, y=c_mon_ped_plan, name="Meta Plan", marker_color="#E2E8F0"))
-                fig_c_ped.add_trace(go.Bar(x=pt_months_labels, y=c_mon_ped_real, name="Realizado Actual", marker_color="#16A34A"))
-                fig_c_ped.update_layout(title="Evolução de Pedidos (Unid.)", plot_bgcolor="#FFFFFF", height=280, margin=dict(t=35, b=5, l=5, r=5), legend=dict(orientation="h", y=1.1))
-                st.plotly_chart(fig_c_ped, use_container_width=True)
+                fig_gmv = go.Figure()
+                fig_gmv.add_trace(go.Scatter(x=pt_months_labels, y=c_mon_gmv_plan, name="Budget", line=dict(color="#94A3B8", dash="dash", width=1.5)))
+                fig_gmv.add_trace(go.Scatter(x=pt_months_labels, y=c_mon_gmv_real, name="Actual", line=dict(color="#002060", width=2.5)))
+                fig_gmv.update_layout(title="GMV (R$)", plot_bgcolor="#FFFFFF", height=220, margin=dict(t=30, b=5, l=5, r=5), legend=dict(orientation="h", y=1.15))
+                st.plotly_chart(fig_gmv, use_container_width=True)
                 
             with col_ch2:
-                fig_c_gmv = go.Figure()
-                fig_c_gmv.add_trace(go.Bar(x=pt_months_labels, y=c_mon_gmv_plan, name="Meta Plan", marker_color="#E2E8F0"))
-                fig_c_gmv.add_trace(go.Bar(x=pt_months_labels, y=c_mon_gmv_real, name="Realizado Actual", marker_color="#64748B"))
-                fig_c_gmv.update_layout(title="Evolução de GMV do Parceiro (R$)", plot_bgcolor="#FFFFFF", height=280, margin=dict(t=35, b=5, l=5, r=5), legend=dict(orientation="h", y=1.1))
-                st.plotly_chart(fig_c_gmv, use_container_width=True)
+                fig_rec = go.Figure()
+                fig_rec.add_trace(go.Scatter(x=pt_months_labels, y=c_mon_rec_plan, name="Budget", line=dict(color="#94A3B8", dash="dash", width=1.5)))
+                fig_rec.add_trace(go.Scatter(x=pt_months_labels, y=c_mon_rec_real, name="Actual", line=dict(color="#002060", width=2.5)))
+                fig_rec.update_layout(title="Receita Hanzo (R$)", plot_bgcolor="#FFFFFF", height=220, margin=dict(t=30, b=5, l=5, r=5), legend=dict(orientation="h", y=1.15))
+                st.plotly_chart(fig_rec, use_container_width=True)
                 
-                c_mon_tr_plan = [c_mon_rec_plan[i]/c_mon_gmv_plan[i] if c_mon_gmv_plan[i]>0 else 0.0 for i in range(12)]
-                c_mon_tr_real = [c_mon_rec_real[i]/c_mon_gmv_real[i] if (c_mon_gmv_real[i] and c_mon_gmv_real[i]>0) else None for i in range(12)]
-                
-                fig_c_tr = go.Figure()
-                fig_c_tr.add_trace(go.Scatter(x=pt_months_labels, y=[tr*100 for tr in c_mon_tr_plan], name="Meta Plan", line=dict(color="#64748B", dash="dash", width=2)))
-                fig_c_tr.add_trace(go.Scatter(x=pt_months_labels, y=[tr*100 if tr else None for tr in c_mon_tr_real], name="Realizado Actual", line=dict(color="#002060", width=3)))
-                fig_c_tr.update_layout(title="Evolução do Take Rate (%)", plot_bgcolor="#FFFFFF", height=280, margin=dict(t=35, b=5, l=5, r=5), legend=dict(orientation="h", y=1.1))
-                st.plotly_chart(fig_c_tr, use_container_width=True)
+            with col_ch3:
+                fig_ped = go.Figure()
+                fig_ped.add_trace(go.Scatter(x=pt_months_labels, y=c_mon_ped_plan, name="Budget", line=dict(color="#94A3B8", dash="dash", width=1.5)))
+                fig_ped.add_trace(go.Scatter(x=pt_months_labels, y=c_mon_ped_real, name="Actual", line=dict(color="#002060", width=2.5)))
+                fig_ped.update_layout(title="Pedidos (Unid.)", plot_bgcolor="#FFFFFF", height=220, margin=dict(t=30, b=5, l=5, r=5), legend=dict(orientation="h", y=1.15))
+                st.plotly_chart(fig_ped, use_container_width=True)
 
 # ----------------------------------------------------
 # TAB 8: APRESENTAÇÃO CONSELHO E INVESTIDORES
