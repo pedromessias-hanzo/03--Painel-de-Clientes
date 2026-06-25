@@ -1137,53 +1137,138 @@ elif selected_tab == "🏆 Client Rankings":
         unsafe_allow_html=True
     )
     
-    # 🏆 Client Performance Scorecard (Priority 2)
-    st.markdown("### 🏆 Client Performance Scorecard")
+    # 📐 Matrizes Orçado x Realizado (Foco Executivo)
+    st.markdown("### 📊 Performance vs Orçamento (Orçado x Realizado)")
+    st.markdown(
+        "<div style='font-size: 12px; color: #64748B; margin-bottom: 15px; font-style: italic;'>"
+        "Nota: O Scorecard Consolidado de performance (onde exibido) representa a média de atingimento de GMV, Receita e Pedidos em relação ao orçamento planejado."
+        "</div>",
+        unsafe_allow_html=True
+    )
     
-    # Pre-calculate performers groups
-    top_performers = []
-    average_performers = []
-    underperformers = []
+    # Calculate client matrix data
+    client_matrix_data = []
     for c in filtered_clients:
-        score = client_scores[c]
-        info = {"Cliente": c, "Score": score, "Receita": client_revenue_vals[c], "Status": get_client_status_badge(client_achievements[c])}
-        if score >= 100.0:
-            top_performers.append(info)
-        elif score >= 90.0:
-            average_performers.append(info)
-        else:
-            underperformers.append(info)
+        c_rec_real = 0.0
+        c_gmv_real = 0.0
+        c_ped_real = 0.0
+        c_rec_plan = 0.0
+        c_gmv_plan = 0.0
+        c_ped_plan = 0.0
+        
+        if c in monthly_data:
+            for m in analysis_months:
+                c_rec_plan += monthly_data[c]["Receita Hanzo"]["plan"].get(m, 0.0)
+                c_gmv_plan += monthly_data[c]["GMV"]["plan"].get(m, 0.0)
+                c_ped_plan += monthly_data[c]["Pedidos"]["plan"].get(m, 0.0)
+                
+                if m in realized_months:
+                    c_rec_real += monthly_data[c]["Receita Hanzo"]["real"].get(m, 0.0)
+                    c_gmv_real += monthly_data[c]["GMV"]["real"].get(m, 0.0)
+                    c_ped_real += monthly_data[c]["Pedidos"]["real"].get(m, 0.0)
+                elif not is_ytd and not is_single_month:
+                    c_rec_real += monthly_data[c]["Receita Hanzo"]["plan"].get(m, 0.0)
+                    c_gmv_real += monthly_data[c]["GMV"]["plan"].get(m, 0.0)
+                    c_ped_real += monthly_data[c]["Pedidos"]["plan"].get(m, 0.0)
+                    
+        gmv_ach = c_gmv_real / c_gmv_plan * 100 if c_gmv_plan > 0 else 100.0
+        rec_ach = c_rec_real / c_rec_plan * 100 if c_rec_plan > 0 else 100.0
+        ped_ach = c_ped_real / c_ped_plan * 100 if c_ped_plan > 0 else 100.0
+        
+        client_matrix_data.append({
+            "client": c,
+            "gmv_plan": c_gmv_plan,
+            "gmv_real": c_gmv_real,
+            "gmv_diff": c_gmv_real - c_gmv_plan,
+            "gmv_ach": gmv_ach,
             
-    col_sc1, col_sc2, col_sc3 = st.columns(3)
-    with col_sc1:
-        st.markdown("<h5 style='color:#16A34A; margin-bottom:5px;'>🟢 Top Performers (Score >= 100)</h5>", unsafe_allow_html=True)
-        html = "<div class='executive-table-container'><table class='executive-table'><thead><tr><th>Cliente</th><th class='numeric'>Score</th><th>St</th></tr></thead><tbody>"
-        for item in sorted(top_performers, key=lambda x: x["Score"], reverse=True):
-            html += f"<tr><td><b>{item['Cliente']}</b></td><td class='numeric'>{item['Score']:.1f}</td><td style='text-align:center;'>{item['Status']}</td></tr>"
-        if not top_performers:
-            html += "<tr><td colspan='3'>Nenhum no período</td></tr>"
+            "rec_plan": c_rec_plan,
+            "rec_real": c_rec_real,
+            "rec_diff": c_rec_real - c_rec_plan,
+            "rec_ach": rec_ach,
+            
+            "ped_plan": c_ped_plan,
+            "ped_real": c_ped_real,
+            "ped_diff": c_ped_real - c_ped_plan,
+            "ped_ach": ped_ach
+        })
+
+    def get_attainment_traffic_light(pct):
+        if pct >= 95.0:
+            return "🟢"
+        elif pct >= 90.0:
+            return "🟡"
+        else:
+            return "🔴"
+
+    def generate_gmv_matrix_html(data_list):
+        sorted_data = sorted(data_list, key=lambda x: x["gmv_ach"], reverse=True)
+        html = "<div class='executive-table-container'><table class='executive-table'><thead><tr>"
+        html += "<th>Rank</th><th>Cliente</th><th class='numeric'>Orçado (Plan)</th><th class='numeric'>Realizado (Actual)</th><th class='numeric'>Diferença</th><th class='numeric'>Atingimento</th><th style='text-align:center;'>Farol</th>"
+        html += "</tr></thead><tbody>"
+        for idx, row in enumerate(sorted_data):
+            farol = get_attainment_traffic_light(row['gmv_ach'])
+            diff_color = '#16A34A' if row['gmv_diff']>=0 else '#DC2626'
+            html += f"<tr>"
+            html += f"<td>{idx+1}</td>"
+            html += f"<td><b>{row['client']}</b></td>"
+            html += f"<td class='numeric'>R$ {row['gmv_plan']:,.2f}</td>"
+            html += f"<td class='numeric'>R$ {row['gmv_real']:,.2f}</td>"
+            html += f"<td class='numeric' style='color:{diff_color}'>R$ {row['gmv_diff']:+,.2f}</td>"
+            html += f"<td class='numeric' style='font-weight:700;'>{row['gmv_ach']:.1f}%</td>"
+            html += f"<td style='text-align:center;'>{farol}</td>"
+            html += f"</tr>"
         html += "</tbody></table></div>"
-        st.markdown(html, unsafe_allow_html=True)
-        
-    with col_sc2:
-        st.markdown("<h5 style='color:#D97706; margin-bottom:5px;'>🟡 Average Performers (90 - 99.9)</h5>", unsafe_allow_html=True)
-        html = "<div class='executive-table-container'><table class='executive-table'><thead><tr><th>Cliente</th><th class='numeric'>Score</th><th>St</th></tr></thead><tbody>"
-        for item in sorted(average_performers, key=lambda x: x["Score"], reverse=True):
-            html += f"<tr><td><b>{item['Cliente']}</b></td><td class='numeric'>{item['Score']:.1f}</td><td style='text-align:center;'>{item['Status']}</td></tr>"
-        if not average_performers:
-            html += "<tr><td colspan='3'>Nenhum no período</td></tr>"
+        return html
+
+    def generate_rec_matrix_html(data_list):
+        sorted_data = sorted(data_list, key=lambda x: x["rec_ach"], reverse=True)
+        html = "<div class='executive-table-container'><table class='executive-table'><thead><tr>"
+        html += "<th>Rank</th><th>Cliente</th><th class='numeric'>Orçado (Plan)</th><th class='numeric'>Realizado (Actual)</th><th class='numeric'>Diferença</th><th class='numeric'>Atingimento</th><th style='text-align:center;'>Farol</th>"
+        html += "</tr></thead><tbody>"
+        for idx, row in enumerate(sorted_data):
+            farol = get_attainment_traffic_light(row['rec_ach'])
+            diff_color = '#16A34A' if row['rec_diff']>=0 else '#DC2626'
+            html += f"<tr>"
+            html += f"<td>{idx+1}</td>"
+            html += f"<td><b>{row['client']}</b></td>"
+            html += f"<td class='numeric'>R$ {row['rec_plan']:,.2f}</td>"
+            html += f"<td class='numeric'>R$ {row['rec_real']:,.2f}</td>"
+            html += f"<td class='numeric' style='color:{diff_color}'>R$ {row['rec_diff']:+,.2f}</td>"
+            html += f"<td class='numeric' style='font-weight:700;'>{row['rec_ach']:.1f}%</td>"
+            html += f"<td style='text-align:center;'>{farol}</td>"
+            html += f"</tr>"
         html += "</tbody></table></div>"
-        st.markdown(html, unsafe_allow_html=True)
-        
-    with col_sc3:
-        st.markdown("<h5 style='color:#DC2626; margin-bottom:5px;'>🔴 Underperformers (< 90)</h5>", unsafe_allow_html=True)
-        html = "<div class='executive-table-container'><table class='executive-table'><thead><tr><th>Cliente</th><th class='numeric'>Score</th><th>St</th></tr></thead><tbody>"
-        for item in sorted(underperformers, key=lambda x: x["Score"], reverse=True):
-            html += f"<tr><td><b>{item['Cliente']}</b></td><td class='numeric'>{item['Score']:.1f}</td><td style='text-align:center;'>{item['Status']}</td></tr>"
-        if not underperformers:
-            html += "<tr><td colspan='3'>Nenhum no período</td></tr>"
+        return html
+
+    def generate_ped_matrix_html(data_list):
+        sorted_data = sorted(data_list, key=lambda x: x["ped_ach"], reverse=True)
+        html = "<div class='executive-table-container'><table class='executive-table'><thead><tr>"
+        html += "<th>Rank</th><th>Cliente</th><th class='numeric'>Orçado (Plan)</th><th class='numeric'>Realizado (Actual)</th><th class='numeric'>Diferença</th><th class='numeric'>Atingimento</th><th style='text-align:center;'>Farol</th>"
+        html += "</tr></thead><tbody>"
+        for idx, row in enumerate(sorted_data):
+            farol = get_attainment_traffic_light(row['ped_ach'])
+            diff_color = '#16A34A' if row['ped_diff']>=0 else '#DC2626'
+            html += f"<tr>"
+            html += f"<td>{idx+1}</td>"
+            html += f"<td><b>{row['client']}</b></td>"
+            html += f"<td class='numeric'>{row['ped_plan']:,.0f}</td>"
+            html += f"<td class='numeric'>{row['ped_real']:,.0f}</td>"
+            html += f"<td class='numeric' style='color:{diff_color}'>{row['ped_diff']:+,.0f}</td>"
+            html += f"<td class='numeric' style='font-weight:700;'>{row['ped_ach']:.1f}%</td>"
+            html += f"<td style='text-align:center;'>{farol}</td>"
+            html += f"</tr>"
         html += "</tbody></table></div>"
-        st.markdown(html, unsafe_allow_html=True)
+        return html
+
+    st.markdown("#### A) Matriz GMV — Orçado x Realizado por Cliente")
+    st.markdown(generate_gmv_matrix_html(client_matrix_data), unsafe_allow_html=True)
+
+    st.markdown("#### B) Matriz Receita — Orçado x Realizado por Cliente")
+    st.markdown(generate_rec_matrix_html(client_matrix_data), unsafe_allow_html=True)
+
+    st.markdown("#### C) Matriz Pedidos — Orçado x Realizado por Cliente")
+    st.markdown(generate_ped_matrix_html(client_matrix_data), unsafe_allow_html=True)
     
     # Pre-calculate client actuals YTD
     client_kpis = []
@@ -1774,20 +1859,38 @@ elif selected_tab == "🎯 Strategic Matrix":
         else "Low Priority", axis=1
     )
     
+    def generate_risk_table_html(subset_df):
+        if subset_df.empty:
+            return "<div class='executive-table-container'><table class='executive-table'><tbody><tr><td style='text-align:center; color:#64748B; padding:10px;'>Nenhum cliente neste quadrante</td></tr></tbody></table></div>"
+        
+        html = "<div class='executive-table-container'><table class='executive-table'><thead><tr>"
+        html += "<th>Cliente</th><th class='numeric'>Receita (2026)</th><th class='numeric'>Crescimento % (YoY)</th>"
+        html += "</tr></thead><tbody>"
+        for _, row in subset_df.iterrows():
+            html += f"<tr>"
+            html += f"<td><b>{row['Cliente']}</b></td>"
+            html += f"<td class='numeric'>R$ {row['Receita']:,.2f}</td>"
+            html += f"<td class='numeric'>{row['Crescimento %']*100:+.1f}%</td>"
+            html += f"</tr>"
+        html += "</tbody></table></div>"
+        return html
+
     col_ri1, col_ri2 = st.columns(2)
     with col_ri1:
         st.markdown("<div style='background-color:#E0F2FE; padding:15px; border-radius:8px; border-left:4px solid #0284C7; margin-bottom:10px;'><strong>⭐ Strategic</strong> (Alta Receita + Crescimento Estável/Positivo)</div>", unsafe_allow_html=True)
-        st.write(df_mat[df_mat["Risk Matrix Class"] == "Strategic"][["Cliente", "Receita", "Crescimento %"]].to_dict(orient="records"))
+        st.markdown(generate_risk_table_html(df_mat[df_mat["Risk Matrix Class"] == "Strategic"]), unsafe_allow_html=True)
+        st.markdown("<div style='margin-bottom:15px;'></div>", unsafe_allow_html=True)
         
         st.markdown("<div style='background-color:#DCFCE7; padding:15px; border-radius:8px; border-left:4px solid #16A34A; margin-bottom:10px;'><strong>🚀 Expansion</strong> (Baixa Receita + Alto Crescimento)</div>", unsafe_allow_html=True)
-        st.write(df_mat[df_mat["Risk Matrix Class"] == "Expansion"][["Cliente", "Receita", "Crescimento %"]].to_dict(orient="records"))
+        st.markdown(generate_risk_table_html(df_mat[df_mat["Risk Matrix Class"] == "Expansion"]), unsafe_allow_html=True)
         
     with col_ri2:
         st.markdown("<div style='background-color:#FEE2E2; padding:15px; border-radius:8px; border-left:4px solid #DC2626; margin-bottom:10px;'><strong>⚠️ At Risk</strong> (Alta Receita + Crescimento Negativo)</div>", unsafe_allow_html=True)
-        st.write(df_mat[df_mat["Risk Matrix Class"] == "At Risk"][["Cliente", "Receita", "Crescimento %"]].to_dict(orient="records"))
+        st.markdown(generate_risk_table_html(df_mat[df_mat["Risk Matrix Class"] == "At Risk"]), unsafe_allow_html=True)
+        st.markdown("<div style='margin-bottom:15px;'></div>", unsafe_allow_html=True)
         
         st.markdown("<div style='background-color:#F1F5F9; padding:15px; border-radius:8px; border-left:4px solid #64748B; margin-bottom:10px;'><strong>💤 Low Priority</strong> (Baixa Receita + Baixo Crescimento)</div>", unsafe_allow_html=True)
-        st.write(df_mat[df_mat["Risk Matrix Class"] == "Low Priority"][["Cliente", "Receita", "Crescimento %"]].to_dict(orient="records"))
+        st.markdown(generate_risk_table_html(df_mat[df_mat["Risk Matrix Class"] == "Low Priority"]), unsafe_allow_html=True)
 
     # Strategic Ranking
     st.markdown("### 🏆 Ranking Estratégico do Portfólio")
