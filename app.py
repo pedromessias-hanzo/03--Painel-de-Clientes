@@ -114,32 +114,15 @@ last_realized_month_pt = EN_TO_PT[last_realized_month]
 # HEADER, NAVIGATION & FILTERS REDESIGN (No Sidebar)
 tabs_nav = [
     "🏛 Presidency Overview",
-    "🏆 Client Rankings",
-    "📉 Detractors",
-    "📈 Forecast & Budget",
-    "🎯 Strategic Matrix",
-    "🎯 Strategic Matrix", # Wait, why is it duplicated? Let's check: in tabs_nav there should only be one "🎯 Strategic Matrix". Yes, let's write it down correctly:
-    "🏛 Presidency Overview",
+    "👤 Client 360",
     "🏆 Client Rankings",
     "📉 Detractors",
     "📈 Forecast & Budget",
     "🎯 Strategic Matrix",
     "⚠ Risks & Opportunities",
-    "👤 Client 360",
     "👔 Board & Investors"
 ]
 
-# Wait, let's write clean tabs_nav:
-tabs_nav = [
-    "🏛 Presidency Overview",
-    "🏆 Client Rankings",
-    "📉 Detractors",
-    "📈 Forecast & Budget",
-    "🎯 Strategic Matrix",
-    "⚠ Risks & Opportunities",
-    "👤 Client 360",
-    "👔 Board & Investors"
-]
 
 OLD_TO_NEW_MAP = {
     "Visão Executiva": "🏛 Presidency Overview",
@@ -856,6 +839,125 @@ if selected_tab == "🏛 Presidency Overview":
         unsafe_allow_html=True
     )
 
+    # 1. Take Rate Analytics for Presidency page
+    take_rates_list_p = []
+    for c in filtered_clients:
+        if c not in monthly_data:
+            continue
+        c_rec = sum(monthly_data[c]["Receita Hanzo"]["plan"].values())
+        c_gmv = sum(monthly_data[c]["GMV"]["plan"].values())
+        if c_gmv > 0:
+            take_rates_list_p.append({"Cliente": c, "Take Rate": c_rec / c_gmv, "GMV": c_gmv})
+    df_tr_p = pd.DataFrame(take_rates_list_p)
+    
+    st.markdown("### 📊 Analytics de Take Rate (Comercial)")
+    col_tr_p1, col_tr_p2 = st.columns(2)
+    
+    def generate_pres_tr_table_html(df):
+        if df.empty:
+            return "<div class='executive-table-container'><table class='executive-table'><tbody><tr><td style='text-align:center;'>Nenhum cliente</td></tr></tbody></table></div>"
+        html = "<div class='executive-table-container'><table class='executive-table'><thead><tr>"
+        html += "<th>Cliente</th><th class='numeric'>Take Rate %</th><th class='numeric'>GMV</th>"
+        html += "</tr></thead><tbody>"
+        for _, row in df.iterrows():
+            html += f"<tr>"
+            html += f"<td><b>{row['Cliente']}</b></td>"
+            html += f"<td class='numeric'>{row['Take Rate']*100:.2f}%</td>"
+            html += f"<td class='numeric'>R$ {row['GMV']:,.0f}</td>"
+            html += f"</tr>"
+        html += "</tbody></table></div>"
+        return html
+
+    with col_tr_p1:
+        st.markdown("<h5 style='font-family:Outfit; font-weight:600; text-align:center;'>Maiores Take Rates</h5>", unsafe_allow_html=True)
+        if not df_tr_p.empty:
+            df_tr_high = df_tr_p.sort_values("Take Rate", ascending=False).head(5)
+        else:
+            df_tr_high = pd.DataFrame()
+        st.markdown(generate_pres_tr_table_html(df_tr_high), unsafe_allow_html=True)
+        
+    with col_tr_p2:
+        st.markdown("<h5 style='font-family:Outfit; font-weight:600; text-align:center;'>Menores Take Rates / Alavancas Comerciais</h5>", unsafe_allow_html=True)
+        if not df_tr_p.empty:
+            df_tr_low = df_tr_p.sort_values("Take Rate").head(5)
+        else:
+            df_tr_low = pd.DataFrame()
+        st.markdown(generate_pres_tr_table_html(df_tr_low), unsafe_allow_html=True)
+
+    # 2. Risks & Opportunities for Presidency page (Top 5)
+    riscos_p = []
+    oportunidades_p = []
+    
+    for c in filtered_clients:
+        if c not in monthly_data:
+            continue
+        c_rec_25 = overview_data[c]["2025"]["Receita Hanzo"] if c in overview_data else 0.0
+        c_rec_26 = overview_data[c]["2026"]["Receita Hanzo"] if c in overview_data else 0.0
+        c_gmv_26 = overview_data[c]["2026"]["GMV"] if c in overview_data else 0.0
+        
+        c_growth = (c_rec_26 - c_rec_25) / c_rec_25 if c_rec_25 > 0 else 0.0
+        c_take_rate = c_rec_26 / c_gmv_26 if c_gmv_26 > 0 else 0.0
+        
+        # Risk identification
+        if c_growth < -0.05:
+            riscos_p.append({
+                "Cliente": c, "Risco": "Retração de Receita", "Var %": c_growth, "Valor R$": c_rec_26 - c_rec_25
+            })
+        if c_take_rate < 0.03 and c_gmv_26 > 1000000:
+            oportunidades_p.append({
+                "Cliente": c, "Oportunidade": "Expansão de Take Rate", "Take Rate Atual": c_take_rate, "GMV 2026": c_gmv_26, "SortVal": c_gmv_26
+            })
+        if c_growth > 0.15:
+            oportunidades_p.append({
+                "Cliente": c, "Oportunidade": "Alto Crescimento YoY", "Crescimento %": c_growth, "Receita 2026": c_rec_26, "SortVal": c_rec_26
+            })
+
+    riscos_sorted_p = sorted(riscos_p, key=lambda x: x["Valor R$"])[:5]
+    oportunidades_sorted_p = sorted(oportunidades_p, key=lambda x: x.get("SortVal", 0.0), reverse=True)[:5]
+
+    st.markdown("### ⚖️ Principais Riscos e Oportunidades")
+    col_ro_p1, col_ro_p2 = st.columns(2)
+    
+    with col_ro_p1:
+        st.markdown("<h5 style='font-family:Outfit; font-weight:600;'>⚠️ Principais Riscos</h5>", unsafe_allow_html=True)
+        if not risks_sorted_p:
+            st.info("Nenhum risco relevante identificado no portfólio selecionado.")
+        else:
+            for r in risks_sorted_p:
+                st.markdown(
+                    f"<div class='executive-alert executive-alert-danger'>"
+                    f"<div>"
+                    f"<div class='executive-alert-title'>{r['Cliente']}</div>"
+                    f"<div class='executive-alert-desc'>Retração de Receita: Var {r['Var %']*100:+.1f}% (Impacto de R$ {r['Valor R$']:,.2f})</div>"
+                    f"</div></div>",
+                    unsafe_allow_html=True
+                )
+                
+    with col_ro_p2:
+        st.markdown("<h5 style='font-family:Outfit; font-weight:600;'>💡 Principais Oportunidades</h5>", unsafe_allow_html=True)
+        if not oportunidades_sorted_p:
+            st.info("Nenhuma oportunidade relevante identificada.")
+        else:
+            for o in oportunidades_sorted_p:
+                if "Take Rate" in o["Oportunidade"]:
+                    st.markdown(
+                        f"<div class='executive-alert executive-alert-success'>"
+                        f"<div>"
+                        f"<div class='executive-alert-title'>{o['Cliente']}</div>"
+                        f"<div class='executive-alert-desc'>Expansão de Take Rate: Atual {o['Take Rate Atual']*100:.2f}% (GMV de R$ {o['GMV 2026']:,.2f})</div>"
+                        f"</div></div>",
+                        unsafe_allow_html=True
+                    )
+                else:
+                    st.markdown(
+                        f"<div class='executive-alert executive-alert-success'>"
+                        f"<div>"
+                        f"<div class='executive-alert-title'>{o['Cliente']}</div>"
+                        f"<div class='executive-alert-desc'>Alto Crescimento YoY: Var {o['Crescimento %']*100:+.1f}% (Receita de R$ {o['Receita 2026']:,.2f})</div>"
+                        f"</div></div>",
+                        unsafe_allow_html=True
+                    )
+
     # Budget vs Actual Analysis Table
     st.markdown("### 📊 Budget vs. Actual YTD Analysis")
     
@@ -1170,10 +1272,10 @@ elif selected_tab == "🏆 Client Rankings":
                     c_rec_real += monthly_data[c]["Receita Hanzo"]["plan"].get(m, 0.0)
                     c_gmv_real += monthly_data[c]["GMV"]["plan"].get(m, 0.0)
                     c_ped_real += monthly_data[c]["Pedidos"]["plan"].get(m, 0.0)
-                    
-        gmv_ach = c_gmv_real / c_gmv_plan * 100 if c_gmv_plan > 0 else 100.0
-        rec_ach = c_rec_real / c_rec_plan * 100 if c_rec_plan > 0 else 100.0
-        ped_ach = c_ped_real / c_ped_plan * 100 if c_ped_plan > 0 else 100.0
+        
+        gmv_ach = None if (c_gmv_plan == 0 and c_gmv_real == 0) else (c_gmv_real / c_gmv_plan * 100 if c_gmv_plan > 0 else 100.0)
+        rec_ach = None if (c_rec_plan == 0 and c_rec_real == 0) else (c_rec_real / c_rec_plan * 100 if c_rec_plan > 0 else 100.0)
+        ped_ach = None if (c_ped_plan == 0 and c_ped_real == 0) else (c_ped_real / c_ped_plan * 100 if c_ped_plan > 0 else 100.0)
         
         client_matrix_data.append({
             "client": c,
@@ -1194,6 +1296,8 @@ elif selected_tab == "🏆 Client Rankings":
         })
 
     def get_attainment_traffic_light(pct):
+        if pct is None:
+            return "—"
         if pct >= 95.0:
             return "🟢"
         elif pct >= 90.0:
@@ -1202,60 +1306,93 @@ elif selected_tab == "🏆 Client Rankings":
             return "🔴"
 
     def generate_gmv_matrix_html(data_list):
-        sorted_data = sorted(data_list, key=lambda x: x["gmv_ach"], reverse=True)
+        sorted_data = sorted(data_list, key=lambda x: (
+            1 if x["gmv_ach"] is None else 0,
+            -x["gmv_ach"] if x["gmv_ach"] is not None else 0
+        ))
         html = "<div class='executive-table-container'><table class='executive-table'><thead><tr>"
         html += "<th>Rank</th><th>Cliente</th><th class='numeric'>Orçado (Plan)</th><th class='numeric'>Realizado (Actual)</th><th class='numeric'>Diferença</th><th class='numeric'>Atingimento</th><th style='text-align:center;'>Farol</th>"
         html += "</tr></thead><tbody>"
         for idx, row in enumerate(sorted_data):
-            farol = get_attainment_traffic_light(row['gmv_ach'])
-            diff_color = '#16A34A' if row['gmv_diff']>=0 else '#DC2626'
+            if row['gmv_ach'] is None:
+                farol = "—"
+                diff_str = "R$ 0"
+                ach_str = "- %"
+                diff_color = '#64748B'
+            else:
+                farol = get_attainment_traffic_light(row['gmv_ach'])
+                diff_str = f"R$ {row['gmv_diff']:+,.2f}"
+                ach_str = f"{row['gmv_ach']:.1f}%"
+                diff_color = '#16A34A' if row['gmv_diff']>=0 else '#DC2626'
             html += f"<tr>"
             html += f"<td>{idx+1}</td>"
             html += f"<td><b>{row['client']}</b></td>"
             html += f"<td class='numeric'>R$ {row['gmv_plan']:,.2f}</td>"
             html += f"<td class='numeric'>R$ {row['gmv_real']:,.2f}</td>"
-            html += f"<td class='numeric' style='color:{diff_color}'>R$ {row['gmv_diff']:+,.2f}</td>"
-            html += f"<td class='numeric' style='font-weight:700;'>{row['gmv_ach']:.1f}%</td>"
+            html += f"<td class='numeric' style='color:{diff_color}'>{diff_str}</td>"
+            html += f"<td class='numeric' style='font-weight:700;'>{ach_str}</td>"
             html += f"<td style='text-align:center;'>{farol}</td>"
             html += f"</tr>"
         html += "</tbody></table></div>"
         return html
 
     def generate_rec_matrix_html(data_list):
-        sorted_data = sorted(data_list, key=lambda x: x["rec_ach"], reverse=True)
+        sorted_data = sorted(data_list, key=lambda x: (
+            1 if x["rec_ach"] is None else 0,
+            -x["rec_ach"] if x["rec_ach"] is not None else 0
+        ))
         html = "<div class='executive-table-container'><table class='executive-table'><thead><tr>"
         html += "<th>Rank</th><th>Cliente</th><th class='numeric'>Orçado (Plan)</th><th class='numeric'>Realizado (Actual)</th><th class='numeric'>Diferença</th><th class='numeric'>Atingimento</th><th style='text-align:center;'>Farol</th>"
         html += "</tr></thead><tbody>"
         for idx, row in enumerate(sorted_data):
-            farol = get_attainment_traffic_light(row['rec_ach'])
-            diff_color = '#16A34A' if row['rec_diff']>=0 else '#DC2626'
+            if row['rec_ach'] is None:
+                farol = "—"
+                diff_str = "R$ 0"
+                ach_str = "- %"
+                diff_color = '#64748B'
+            else:
+                farol = get_attainment_traffic_light(row['rec_ach'])
+                diff_str = f"R$ {row['rec_diff']:+,.2f}"
+                ach_str = f"{row['rec_ach']:.1f}%"
+                diff_color = '#16A34A' if row['rec_diff']>=0 else '#DC2626'
             html += f"<tr>"
             html += f"<td>{idx+1}</td>"
             html += f"<td><b>{row['client']}</b></td>"
             html += f"<td class='numeric'>R$ {row['rec_plan']:,.2f}</td>"
             html += f"<td class='numeric'>R$ {row['rec_real']:,.2f}</td>"
-            html += f"<td class='numeric' style='color:{diff_color}'>R$ {row['rec_diff']:+,.2f}</td>"
-            html += f"<td class='numeric' style='font-weight:700;'>{row['rec_ach']:.1f}%</td>"
+            html += f"<td class='numeric' style='color:{diff_color}'>{diff_str}</td>"
+            html += f"<td class='numeric' style='font-weight:700;'>{ach_str}</td>"
             html += f"<td style='text-align:center;'>{farol}</td>"
             html += f"</tr>"
         html += "</tbody></table></div>"
         return html
 
     def generate_ped_matrix_html(data_list):
-        sorted_data = sorted(data_list, key=lambda x: x["ped_ach"], reverse=True)
+        sorted_data = sorted(data_list, key=lambda x: (
+            1 if x["ped_ach"] is None else 0,
+            -x["ped_ach"] if x["ped_ach"] is not None else 0
+        ))
         html = "<div class='executive-table-container'><table class='executive-table'><thead><tr>"
         html += "<th>Rank</th><th>Cliente</th><th class='numeric'>Orçado (Plan)</th><th class='numeric'>Realizado (Actual)</th><th class='numeric'>Diferença</th><th class='numeric'>Atingimento</th><th style='text-align:center;'>Farol</th>"
         html += "</tr></thead><tbody>"
         for idx, row in enumerate(sorted_data):
-            farol = get_attainment_traffic_light(row['ped_ach'])
-            diff_color = '#16A34A' if row['ped_diff']>=0 else '#DC2626'
+            if row['ped_ach'] is None:
+                farol = "—"
+                diff_str = "0"
+                ach_str = "- %"
+                diff_color = '#64748B'
+            else:
+                farol = get_attainment_traffic_light(row['ped_ach'])
+                diff_str = f"{row['ped_diff']:+,.0f}"
+                ach_str = f"{row['ped_ach']:.1f}%"
+                diff_color = '#16A34A' if row['ped_diff']>=0 else '#DC2626'
             html += f"<tr>"
             html += f"<td>{idx+1}</td>"
             html += f"<td><b>{row['client']}</b></td>"
             html += f"<td class='numeric'>{row['ped_plan']:,.0f}</td>"
             html += f"<td class='numeric'>{row['ped_real']:,.0f}</td>"
-            html += f"<td class='numeric' style='color:{diff_color}'>{row['ped_diff']:+,.0f}</td>"
-            html += f"<td class='numeric' style='font-weight:700;'>{row['ped_ach']:.1f}%</td>"
+            html += f"<td class='numeric' style='color:{diff_color}'>{diff_str}</td>"
+            html += f"<td class='numeric' style='font-weight:700;'>{ach_str}</td>"
             html += f"<td style='text-align:center;'>{farol}</td>"
             html += f"</tr>"
         html += "</tbody></table></div>"
@@ -2209,10 +2346,10 @@ elif selected_tab == "👤 Client 360":
             portfolio_position_desc = get_rank_suffix(client_rank)
             
             rank_card_html = f"""
-            <div style='border: 1px solid #E2E8F0; padding: 15px; border-radius: 6px; background-color:#FFFFFF; text-align: center;'>
-                <div style='font-size: 18px; font-weight: 800; color: #002060;'>{portfolio_position_desc}</div>
-                <div style='font-size: 11px; color: #64748B; font-weight: 700; text-transform: uppercase; margin-top: 8px;'>REVENUE SHARE YTD</div>
-                <div style='font-size: 24px; font-weight: 800; color: #16A34A; margin-top: 3px;'>{client_rev_share*100:.1f}%</div>
+            <div style='border: 1px solid #E2E8F0; padding: 15px; border-radius: 6px; background-color:#FFFFFF; text-align: center; line-height: 1.4;'>
+                <div style='font-size: 20px; font-weight: 800; color: #334155;'>{selected_c}</div>
+                <div style='font-size: 16px; font-weight: 700; color: #002060; margin-top: 4px;'>{portfolio_position_desc}</div>
+                <div style='font-size: 12px; color: #64748B; font-weight: 700; text-transform: uppercase; margin-top: 8px;'>Revenue Share YTD: <span style='color: #16A34A; font-size: 15px; font-weight: 800;'>{client_rev_share*100:.1f}%</span></div>
             </div>
             """
             st.markdown(rank_card_html, unsafe_allow_html=True)
