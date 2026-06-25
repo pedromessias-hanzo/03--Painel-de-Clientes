@@ -912,8 +912,8 @@ if selected_tab == "🏛 Presidency Overview":
                 "Cliente": c, "Oportunidade": "Alto Crescimento YoY", "Crescimento %": c_growth, "Receita 2026": c_rec_26, "SortVal": c_rec_26
             })
 
-    riscos_sorted_p = sorted(riscos_p, key=lambda x: x["Valor R$"])[:5]
-    oportunidades_sorted_p = sorted(oportunidades_p, key=lambda x: x.get("SortVal", 0.0), reverse=True)[:5]
+    risks_sorted_p = sorted(riscos_p, key=lambda x: x["Valor R$"])[:5]
+    opportunities_sorted_p = sorted(oportunidades_p, key=lambda x: x.get("SortVal", 0.0), reverse=True)[:5]
 
     st.markdown("### ⚖️ Principais Riscos e Oportunidades")
     col_ro_p1, col_ro_p2 = st.columns(2)
@@ -921,7 +921,7 @@ if selected_tab == "🏛 Presidency Overview":
     with col_ro_p1:
         st.markdown("<h5 style='font-family:Outfit; font-weight:600;'>⚠️ Principais Riscos</h5>", unsafe_allow_html=True)
         if not risks_sorted_p:
-            st.info("Nenhum risco relevante identificado no portfólio selecionado.")
+            st.info("Nenhum risco relevante identificado no período.")
         else:
             for r in risks_sorted_p:
                 st.markdown(
@@ -935,10 +935,10 @@ if selected_tab == "🏛 Presidency Overview":
                 
     with col_ro_p2:
         st.markdown("<h5 style='font-family:Outfit; font-weight:600;'>💡 Principais Oportunidades</h5>", unsafe_allow_html=True)
-        if not oportunidades_sorted_p:
-            st.info("Nenhuma oportunidade relevante identificada.")
+        if not opportunities_sorted_p:
+            st.info("Nenhuma oportunidade relevante identificada no período.")
         else:
-            for o in oportunidades_sorted_p:
+            for o in opportunities_sorted_p:
                 if "Take Rate" in o["Oportunidade"]:
                     st.markdown(
                         f"<div class='executive-alert executive-alert-success'>"
