@@ -1,0 +1,271 @@
+/* Stylesheet for Hanzo Executive Dashboard (Big Four Corporate Standard) */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
+
+/* Main Page Style Overrides */
+html, body, [data-testid="stAppViewContainer"] {
+    background-color: #FFFFFF !important;
+    font-family: 'Inter', sans-serif !important;
+    color: #334155 !important;
+}
+
+/* Sidebar Custom Styling */
+[data-testid="stSidebar"] {
+    background-color: #F8FAFC !important;
+    border-right: 1px solid #E2E8F0 !important;
+}
+
+/* Header Text Styles */
+h1, h2, h3 {
+    font-family: 'Outfit', sans-serif !important;
+    font-weight: 700 !important;
+    color: #0F172A !important;
+}
+
+h1 {
+    font-size: 2.25rem !important;
+    margin-bottom: 0.5rem !important;
+    letter-spacing: -0.025em !important;
+}
+
+h2 {
+    font-size: 1.5rem !important;
+    margin-top: 1.5rem !important;
+    margin-bottom: 0.75rem !important;
+    border-bottom: 2px solid #F1F5F9;
+    padding-bottom: 0.5rem;
+}
+
+h3 {
+    font-size: 1.25rem !important;
+    margin-top: 1rem !important;
+    margin-bottom: 0.5rem !important;
+}
+
+/* Premium Title Banner */
+.title-container {
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+    padding: 24px 32px;
+    border-radius: 12px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+}
+
+.title-container h1 {
+    color: #FFFFFF !important;
+    margin: 0 !important;
+    font-family: 'Outfit', sans-serif !important;
+}
+
+.title-container p {
+    color: #94A3B8;
+    margin: 4px 0 0 0 !important;
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+/* KPI Metric Card Styling */
+.metric-card {
+    background-color: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+    transition: all 0.2s ease-in-out;
+}
+
+.metric-card:hover {
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+    transform: translateY(-2px);
+}
+
+/* Card Accent Borders */
+.accent-blue { border-left: 4px solid #002060 !important; }
+.accent-green { border-left: 4px solid #16A34A !important; }
+.accent-red { border-left: 4px solid #DC2626 !important; }
+.accent-amber { border-left: 4px solid #D97706 !important; }
+.accent-slate { border-left: 4px solid #64748B !important; }
+
+.metric-card-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748B;
+    margin-bottom: 6px;
+}
+
+.metric-card-value {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #0F172A;
+    line-height: 1.1;
+    margin-bottom: 6px;
+}
+
+.metric-card-delta {
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+}
+
+.delta-positive { color: #16A34A; }
+.delta-negative { color: #DC2626; }
+.delta-neutral { color: #64748B; }
+
+/* Business Alerts */
+.executive-alert {
+    display: flex;
+    align-items: flex-start;
+    padding: 14px 20px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    border-left: 4px solid transparent;
+}
+
+.executive-alert-danger {
+    background-color: #FEE2E2;
+    color: #991B1B;
+    border-left-color: #DC2626;
+}
+
+.executive-alert-warning {
+    background-color: #FEF3C7;
+    color: #92400E;
+    border-left-color: #D97706;
+}
+
+.executive-alert-success {
+    background-color: #D1FAE5;
+    color: #065F46;
+    border-left-color: #10B981;
+}
+
+.executive-alert-info {
+    background-color: #E0F2FE;
+    color: #075985;
+    border-left-color: #0284C7;
+}
+
+.executive-alert-title {
+    font-weight: 700;
+    margin-bottom: 2px;
+    font-size: 0.95rem;
+}
+
+.executive-alert-desc {
+    font-weight: 500;
+}
+
+/* Custom Executive Table Styling */
+.executive-table-container {
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+}
+
+.executive-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    text-align: left;
+    background-color: #FFFFFF;
+}
+
+.executive-table th {
+    background-color: #F8FAFC;
+    color: #475569;
+    font-weight: 600;
+    padding: 10px 14px;
+    border-bottom: 1px solid #E2E8F0;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+}
+
+.executive-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #F1F5F9;
+    color: #334155;
+    font-weight: 500;
+}
+
+.executive-table tr:last-child td {
+    border-bottom: none;
+}
+
+.executive-table tr.bold td {
+    font-weight: 700 !important;
+    background-color: #F8FAFC;
+    color: #0F172A;
+}
+
+.executive-table tr.total-row td {
+    font-weight: 800 !important;
+    background-color: #F1F5F9;
+    color: #0F172A;
+    border-top: 2px solid #CBD5E1;
+    border-bottom: 2px solid #CBD5E1;
+}
+
+.executive-table td.numeric {
+    text-align: right;
+    font-family: monospace;
+    font-size: 0.9rem;
+}
+
+.executive-table th.numeric {
+    text-align: right;
+}
+
+/* Heatmap Grid Cell */
+.heatmap-cell {
+    padding: 8px !important;
+    text-align: center !important;
+    font-weight: 700 !important;
+    border-radius: 4px;
+    font-size: 0.8rem !important;
+}
+
+.heatmap-grow { background-color: #DCFCE7 !important; color: #15803D !important; }
+.heatmap-stable { background-color: #FEF3C7 !important; color: #B45309 !important; }
+.heatmap-decline { background-color: #FEE2E2 !important; color: #B91C1C !important; }
+
+/* Status Badges */
+.badge {
+    display: inline-block;
+    padding: 3px 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 9999px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.badge-green { background-color: #DCFCE7; color: #16A34A; }
+.badge-red { background-color: #FEE2E2; color: #DC2626; }
+.badge-yellow { background-color: #FEF3C7; color: #D97706; }
+.badge-blue { background-color: #E0F2FE; color: #0284C7; }
+
+/* Scrollbars styling */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #F1F5F9;
+}
+::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #94A3B8;
+}
