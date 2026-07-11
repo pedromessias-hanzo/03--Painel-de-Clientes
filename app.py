@@ -807,61 +807,76 @@ for quad in quadrants_setup:
             
         st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
         
-        # 3. EVOLUTION CHART
-        st.markdown(f'<div class="table-section-title">Evolução Histórica</div>', unsafe_allow_html=True)
+        # 3. CLIENT PERFORMANCE DISTRIBUTION CHART (diverging bar chart)
+        st.markdown(f'<div class="table-section-title">Distribuição de Performance dos Clientes</div>', unsafe_allow_html=True)
         
+        chart_bars = []
+        
+        # Bottom 5 (Slate Grey)
+        for idx, row in enumerate(reversed(sorted_bottom[:5])):
+            share_val = (row["curr"] / group_curr_total) * 100 if group_curr_total > 0 else 0.0
+            chart_bars.append({
+                "client_label": row["client"] + " (Bottom)",
+                "client_display": row["client"],
+                "val": -row["curr"],
+                "color": "#64748B",
+                "share": share_val,
+                "val_real": row["curr"]
+            })
+            
+        # Top 5 (Emerald Green)
+        for idx, row in enumerate(reversed(sorted_top[:5])):
+            share_val = (row["curr"] / group_curr_total) * 100 if group_curr_total > 0 else 0.0
+            chart_bars.append({
+                "client_label": row["client"] + " (Top)",
+                "client_display": row["client"],
+                "val": row["curr"],
+                "color": "#166534",
+                "share": share_val,
+                "val_real": row["curr"]
+            })
+            
         fig = go.Figure()
         
-        plan_MoM = []
-        real_MoM = []
-        
-        for m in EN_MONTHS:
-            if m in m_map_proj:
-                cl_plan = sum(data_loader.clean_val(monthly_data[c][q_key]["plan"][m]) for c in filtered_clients)
-                cl_real = sum(data_loader.clean_val(monthly_data[c][q_key]["real"][m]) for c in filtered_clients)
-                
+        if chart_bars:
+            x_vals = [b["val"] for b in chart_bars]
+            y_vals = [b["client_label"] for b in chart_bars]
+            text_vals = []
+            for b in chart_bars:
                 if quad["is_ticket"]:
-                    g_plan = sum(data_loader.clean_val(monthly_data[c]["GMV"]["plan"][m]) for c in filtered_clients)
-                    p_plan = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["plan"][m]) for c in filtered_clients)
-                    cl_plan = g_plan / p_plan if p_plan > 0 else 0.0
+                    text_vals.append(f"{b['client_display']}: {quad['fmt'](b['val_real'])}")
+                else:
+                    text_vals.append(f"{b['client_display']}: {quad['fmt'](b['val_real'])} ({b['share']:.1f}%)")
                     
-                    g_real = sum(data_loader.clean_val(monthly_data[c]["GMV"]["real"][m]) for c in filtered_clients)
-                    p_real = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["real"][m]) for c in filtered_clients)
-                    cl_real = g_real / p_real if p_real > 0 else 0.0
-            else:
-                cl_plan = 0.0
-                cl_real = 0.0
-                
-            plan_MoM.append(cl_plan)
-            if cl_real > 0 or m == month_sel_en:
-                real_MoM.append(cl_real)
-            else:
-                real_MoM.append(None)
-                
-        fig.add_trace(go.Scatter(
-            x=PT_MONTHS, y=plan_MoM, name="Planejado", line=dict(color="#002060", width=2.5)
-        ))
-        fig.add_trace(go.Scatter(
-            x=PT_MONTHS, y=real_MoM, name="Realizado", line=dict(color="#166534", width=2.5), connectgaps=False
-        ))
-        
-        sel_idx = EN_MONTHS.index(month_sel_en)
-        sel_val = real_MoM[sel_idx] if real_MoM[sel_idx] is not None else plan_MoM[sel_idx]
-        fig.add_trace(go.Scatter(
-            x=[PT_MONTHS[sel_idx]], y=[sel_val],
-            marker=dict(color="#D97706", size=10, line=dict(color="#FFFFFF", width=2)),
-            showlegend=False
-        ))
-        
+            fig.add_trace(go.Bar(
+                x=x_vals,
+                y=y_vals,
+                orientation='h',
+                marker_color=[b["color"] for b in chart_bars],
+                text=text_vals,
+                textposition='outside',
+                textfont=dict(size=11, color="#0F172A"),
+                hoverinfo='text'
+            ))
+            
         fig.update_layout(
-            height=320,
+            height=300,
             margin=dict(l=10, r=10, t=10, b=10),
-            showlegend=True,
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            showlegend=False,
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
-            xaxis=dict(showgrid=True, gridcolor="#F1F5F9"),
-            yaxis=dict(showgrid=True, gridcolor="#F1F5F9")
+            xaxis=dict(
+                showgrid=True,
+                gridcolor="#F1F5F9",
+                zeroline=True,
+                zerolinecolor="#CBD5E1",
+                zerolinewidth=2,
+                showticklabels=False
+            ),
+            yaxis=dict(
+                showgrid=False,
+                showticklabels=False
+            )
         )
         
         st.plotly_chart(fig, use_container_width=True)
