@@ -1154,74 +1154,19 @@ for quad in quadrants_setup:
         st.markdown(f'<div class="quadrant-container">', unsafe_allow_html=True)
         st.markdown(f'<div class="quadrant-title">{quad["title"]}</div>', unsafe_allow_html=True)
         
-        # 1. QUADRANT KPI CARD
-        quad_c_vals = kpis_values[q_key]
-        if quad_c_vals["plan"] == 0:
-            q_real_pct_str = "- %"
-            q_real_farol = "⚪"
-            q_real_color = "#64748B"
-            
-            q_proj_pct_str = "- %"
-            q_proj_farol = "⚪"
-            q_proj_color = "#64748B"
+        # Title mapping based on visualization mode
+        if "Semana" in viz_mode:
+            tbl_top_title = "🏆 Top 5 Clientes da Semana"
+            tbl_bot_title = "📉 Bottom 5 Clientes com Atividade na Semana"
+        elif "Ano" in viz_mode:
+            tbl_top_title = "🏆 Top 5 Clientes no Ano"
+            tbl_bot_title = "📉 Bottom 5 Clientes com Atividade no Ano"
         else:
-            q_real_ratio = quad_c_vals["actual"] / quad_c_vals["plan"]
-            q_real_pct = ((quad_c_vals["actual"] - quad_c_vals["plan"]) / quad_c_vals["plan"]) * 100
-            q_real_pct_str = f"{q_real_pct:+.1f}%".replace(".", ",")
-            
-            if q_real_ratio >= 1.0:
-                q_real_farol = "🟢"
-                q_real_color = "#166534"
-            elif q_real_ratio >= 0.90:
-                q_real_farol = "🟡"
-                q_real_color = "#854D0E"
-            else:
-                q_real_farol = "🔴"
-                q_real_color = "#991B1B"
-                
-            q_proj_ratio = quad_c_vals["proj"] / quad_c_vals["plan"]
-            q_proj_pct = ((quad_c_vals["proj"] - quad_c_vals["plan"]) / quad_c_vals["plan"]) * 100
-            q_proj_pct_str = f"{q_proj_pct:+.1f}%".replace(".", ",")
-            
-            if q_proj_ratio >= 1.0:
-                q_proj_farol = "🟢"
-                q_proj_color = "#166534"
-            elif q_proj_ratio >= 0.90:
-                q_proj_farol = "🟡"
-                q_proj_color = "#854D0E"
-            else:
-                q_proj_farol = "🔴"
-                q_proj_color = "#991B1B"
-                
-        st.markdown(f'''
-        <div class="kpi-card" style="margin-bottom:1rem; border-color:#CBD5E1;">
-            <div class="kpi-main-val" style="font-size:26px !important;">{quad["fmt"](quad_c_vals["actual"])}</div>
-            <div class="kpi-sub-row" style="margin-top:0.5rem; padding-top:0.4rem;">
-                <div>
-                    <div class="kpi-sub-label">PLANEJADO</div>
-                    <div class="kpi-sub-val">{quad["fmt"](quad_c_vals["plan"])}</div>
-                </div>
-                <div>
-                    <div class="kpi-sub-label">PROJEÇÃO RITMO ATUAL</div>
-                    <div class="kpi-sub-val">{quad["fmt"](quad_c_vals["proj"])}</div>
-                </div>
-            </div>
-            <div style="margin-top:0.4rem; border-top:1px solid #E2E8F0; padding-top:0.4rem; font-size:0.75rem; font-weight:700;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.2rem;">
-                    <span style="color:#475569;">Real x Planejado:</span>
-                    <span style="color:{q_real_color}; font-weight:800;">{q_real_pct_str} <span class="kpi-light">{q_real_farol}</span></span>
-                </div>
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="color:#475569;">Projeção x Planejado:</span>
-                    <span style="color:{q_proj_color}; font-weight:800;">{q_proj_pct_str} <span class="kpi-light">{q_proj_farol}</span></span>
-                </div>
-            </div>
-        </div>
-        ''', unsafe_allow_html=True)
-        
+            tbl_top_title = "🏆 Top 5 Clientes do Mês"
+            tbl_bot_title = "📉 Bottom 5 Clientes com Atividade no Mês"
+
         # 2. TOP 5 CLIENTS TABLE
-        tbl_top_title = "🏆 Top 5 Clientes do Mês" if not has_weeks_data else "🏆 Top 5 Clients"
-        st.markdown(f'<div class="table-section-title">{tbl_top_title}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="table-section-title" style="margin-top:0.25rem;">{tbl_top_title}</div>', unsafe_allow_html=True)
         
         if not has_client_level_data:
             msg_unavail = "Ranking YTD por cliente indisponível para este período." if "Ano" in viz_mode else "Ranking por cliente indisponível para este mês."
@@ -1255,7 +1200,6 @@ for quad in quadrants_setup:
         st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
         
         # 3. BOTTOM 5 CLIENTS TABLE
-        tbl_bot_title = "📉 Bottom 5 Clientes com Movimentação no Mês" if not has_weeks_data else "📉 Bottom 5 Clients with Activity"
         st.markdown(f'<div class="table-section-title">{tbl_bot_title}</div>', unsafe_allow_html=True)
         
         if not has_client_level_data:
