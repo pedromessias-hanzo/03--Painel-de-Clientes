@@ -147,17 +147,15 @@ def map_columns(df):
             
     return months_map
 
-def load_data(filepath):
+def load_data(sheets_data):
     """
-    Loads Excel workbook and returns overview and parsed data structures.
+    Loads Excel sheets from the sheets_data dictionary and returns overview and parsed data structures.
     Uses fallback sheet loader.
     """
-    xl = pd.ExcelFile(filepath)
-    
     # 1. PARSE OVERVIEW SHEET
     overview_data = {}
-    if "Overview" in xl.sheet_names:
-        df_ov = xl.parse("Overview")
+    if "Overview" in sheets_data:
+        df_ov = sheets_data["Overview"]
         current_client = None
         wishlist_counter = 0
         for i in range(len(df_ov)):
@@ -202,7 +200,7 @@ def load_data(filepath):
                 }
                 
     # 2. LOAD PLANEJAMENTO OR PROJEÇÃO DYNAMICALLY
-    df_pl = xl.parse("Planejamento", header=None)
+    df_pl = sheets_data.get("Planejamento")
     m_map_pl = map_columns(df_pl)
     has_weekly = any(m_map_pl[m]["weekly"] for m in m_map_pl)
     
@@ -211,9 +209,13 @@ def load_data(filepath):
         m_map = m_map_pl
     else:
         # Fallback to Projeção
-        proj_sheet = "Projeção" if "Projeção" in xl.sheet_names else "Projeo"
-        if proj_sheet in xl.sheet_names:
-            df = xl.parse(proj_sheet, header=None)
+        proj_sheet = None
+        for s in ["Projeção", "Projeo"]:
+            if s in sheets_data:
+                proj_sheet = s
+                break
+        if proj_sheet:
+            df = sheets_data[proj_sheet]
             m_map = map_columns(df)
         else:
             df = df_pl
