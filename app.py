@@ -622,179 +622,154 @@ chart_metric_key = ind_key_map[sel_indicator]
 chart_fmt = fmt_qty if sel_indicator == "Pedidos" else fmt_currency
 short_label = {"GMV": "GMV", "Receita Hanzo": "Receita", "Pedidos": "Pedidos", "Ticket Médio": "Ticket Médio"}[chart_metric_key]
 
-# Calculate lists of values for the chart
-x_labels = []
-y_plan = []
-y_real = []
-y_proj = []
-
-if has_weeks_data and "Ano" not in viz_mode:
-    # Weekly view: "Semana Selecionada" or "Acumulado no Mês"
-    weekly_cols_active = m_map_proj[month_sel_en]["weekly"]
-    num_weeks_active = len(weekly_cols_active)
-    x_labels = [f"Semana {i+1}" for i in range(num_weeks_active)]
-    selected_idx = selected_week_idx
+# Helper to calculate Planejado, Real and Projeção pelo Ritmo Atual series dynamically
+def get_indicator_series(metric):
+    x_lbls = []
+    y_p = []
+    y_r = []
+    y_pr = []
     
-    weights_row = df_proj.iloc[3]
-    weekly_weights = [data_loader.clean_val(weights_row[col]) for col in weekly_cols_active]
-    sum_weights = sum(weekly_weights)
-    if sum_weights == 0:
-        weekly_weights = [1.0 / num_weeks_active] * num_weeks_active
-    else:
-        weekly_weights = [w / sum_weights for w in weekly_weights]
+    if has_weeks_data and "Ano" not in viz_mode:
+        # Weekly view: "Semana Selecionada" or "Acumulado no Mês"
+        weekly_cols_active = m_map_proj[month_sel_en]["weekly"]
+        num_w = len(weekly_cols_active)
+        x_lbls = [f"Semana {i+1}" for i in range(num_w)]
+        sel_i = selected_week_idx
         
-    m_plan_val = sum(data_loader.clean_val(monthly_data[c][chart_metric_key]["plan"][month_sel_en]) for c in filtered_clients)
-    
-    for w in range(num_weeks_active):
-        w_real_val = sum(data_loader.clean_val(weekly_data[c][chart_metric_key]["weekly"][month_sel_en][w]) for c in filtered_clients)
+        weights_row = df_proj.iloc[3]
+        w_weights = [data_loader.clean_val(weights_row[col]) for col in weekly_cols_active]
+        sum_w = sum(w_weights)
+        if sum_w == 0:
+            w_weights = [1.0 / num_w] * num_w
+        else:
+            w_weights = [w / sum_w for w in w_weights]
+            
+        m_plan_val = sum(data_loader.clean_val(monthly_data[c][metric]["plan"][month_sel_en]) for c in filtered_clients)
         
+        # Real weekly values
+        r_vals_all = []
+        for w in range(num_w):
+            w_real_val = sum(data_loader.clean_val(weekly_data[c][metric]["weekly"][month_sel_en][w]) for c in filtered_clients)
+            r_vals_all.append(w_real_val)
+            
         if "Semana" in viz_mode:
-            p_val = m_plan_val * weekly_weights[w]
-            r_val = w_real_val if w <= selected_week_idx else None
+            # Single week values
+            for w in range(num_w):
+                y_p.append(m_plan_val * w_weights[w])
+                y_r.append(r_vals_all[w] if w <= sel_i else None)
+                
+            # Ritmo semanal médio for projection (non-accumulated: average of past weeks)
+            past_real_vals = [v for v in r_vals_all[:sel_i+1] if v is not None]
+            avg_ritmo = sum(past_real_vals) / len(past_real_vals) if past_real_vals else 0.0
             
-            if chart_metric_key == "Ticket Médio":
-                w_gmv = sum(data_loader.clean_val(weekly_data[c]["GMV"]["weekly"][month_sel_en][w]) for c in filtered_clients)
-                w_ped = sum(data_loader.clean_val(weekly_data[c]["Pedidos"]["weekly"][month_sel_en][w]) for c in filtered_clients)
-                r_val = w_gmv / w_ped if w_ped > 0 and w <= selected_week_idx else None
-                
-                plan_gmv_m = sum(data_loader.clean_val(monthly_data[c]["GMV"]["plan"][month_sel_en]) for c in filtered_clients)
-                plan_ped_m = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["plan"][month_sel_en]) for c in filtered_clients)
-                p_val = plan_gmv_m / plan_ped_m if plan_ped_m > 0 else 0.0
-                
-            y_plan.append(p_val)
-            y_real.append(r_val)
-            
-            if r_val is not None:
-                acc_gmv_up_to_w = sum(sum(data_loader.clean_val(weekly_data[c]["GMV"]["weekly"][month_sel_en][k]) for c in filtered_clients) for k in range(w + 1))
-                acc_ped_up_to_w = sum(sum(data_loader.clean_val(weekly_data[c]["Pedidos"]["weekly"][month_sel_en][k]) for c in filtered_clients) for k in range(w + 1))
-                
-                if chart_metric_key == "Ticket Médio":
-                    proj_val = acc_gmv_up_to_w / acc_ped_up_to_w if acc_ped_up_to_w > 0 else 0.0
-                elif chart_metric_key == "Pedidos":
-                    proj_val = ((acc_ped_up_to_w / (w + 1)) * num_weeks_active) / num_weeks_active
+            for w in range(num_w):
+                if w < sel_i:
+                    y_pr.append(None)
+                elif w == sel_i:
+                    y_pr.append(y_r[sel_i]) # start at last real for continuity
                 else:
-                    acc_val_up_to_w = sum(sum(data_loader.clean_val(weekly_data[c][chart_metric_key]["weekly"][month_sel_en][k]) for c in filtered_clients) for k in range(w + 1))
-                    proj_val = ((acc_val_up_to_w / (w + 1)) * num_weeks_active) / num_weeks_active
-                y_proj.append(proj_val)
-            else:
-                y_proj.append(None)
-                
+                    y_pr.append(avg_ritmo)
         else:
             # Acumulado no Mês (MTD)
-            p_val = m_plan_val * sum(weekly_weights[:w+1])
-            
-            if w <= selected_week_idx:
-                if chart_metric_key == "Ticket Médio":
-                    acc_gmv_up_to_w = sum(sum(data_loader.clean_val(weekly_data[c]["GMV"]["weekly"][month_sel_en][k]) for c in filtered_clients) for k in range(w + 1))
-                    acc_ped_up_to_w = sum(sum(data_loader.clean_val(weekly_data[c]["Pedidos"]["weekly"][month_sel_en][k]) for c in filtered_clients) for k in range(w + 1))
-                    r_val = acc_gmv_up_to_w / acc_ped_up_to_w if acc_ped_up_to_w > 0 else 0.0
+            acc_real = 0.0
+            for w in range(num_w):
+                y_p.append(m_plan_val * sum(w_weights[:w+1]))
+                if w <= sel_i:
+                    acc_real += r_vals_all[w]
+                    y_r.append(acc_real)
+                else:
+                    y_r.append(None)
                     
-                    plan_gmv_m = sum(data_loader.clean_val(monthly_data[c]["GMV"]["plan"][month_sel_en]) for c in filtered_clients)
-                    plan_ped_m = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["plan"][month_sel_en]) for c in filtered_clients)
-                    p_val = plan_gmv_m / plan_ped_m if plan_ped_m > 0 else 0.0
-                else:
-                    r_val = sum(sum(data_loader.clean_val(weekly_data[c][chart_metric_key]["weekly"][month_sel_en][k]) for c in filtered_clients) for k in range(w + 1))
-            else:
-                r_val = None
-                
-            y_plan.append(p_val)
-            y_real.append(r_val)
+            # Ritmo semanal médio for projection (accumulated)
+            avg_ritmo = y_r[sel_i] / (sel_i + 1) if (sel_i + 1) > 0 else 0.0
             
-            if r_val is not None:
-                if chart_metric_key == "Ticket Médio":
-                    acc_gmv_up_to_w = sum(sum(data_loader.clean_val(weekly_data[c]["GMV"]["weekly"][month_sel_en][k]) for c in filtered_clients) for k in range(w + 1))
-                    acc_ped_up_to_w = sum(sum(data_loader.clean_val(weekly_data[c]["Pedidos"]["weekly"][month_sel_en][k]) for c in filtered_clients) for k in range(w + 1))
-                    proj_val = acc_gmv_up_to_w / acc_ped_up_to_w if acc_ped_up_to_w > 0 else 0.0
+            for w in range(num_w):
+                if w < sel_i:
+                    y_pr.append(None)
+                elif w == sel_i:
+                    y_pr.append(y_r[sel_i])
                 else:
-                    proj_val = (r_val / (w + 1)) * num_weeks_active
-                y_proj.append(proj_val)
-            else:
-                y_proj.append(None)
-else:
-    # Monthly / YTD view: Jan to Dec
-    x_labels = PT_MONTHS
-    selected_idx = EN_MONTHS.index(month_sel_en)
-    acc_plan = 0.0
-    acc_real = 0.0
-    
-    for m_idx, m in enumerate(EN_MONTHS):
-        m_plan_val = sum(data_loader.clean_val(monthly_data[c][chart_metric_key]["plan"][m]) for c in filtered_clients)
-        m_real_val = sum(data_loader.clean_val(monthly_data[c][chart_metric_key]["real"][m]) for c in filtered_clients)
+                    y_pr.append(y_r[sel_i] + avg_ritmo * (w - sel_i))
+    else:
+        # Monthly / YTD view: Jan to Dec
+        x_lbls = PT_MONTHS
+        sel_i = EN_MONTHS.index(month_sel_en)
+        
+        m_plan_vals = [sum(data_loader.clean_val(monthly_data[c][metric]["plan"][m]) for c in filtered_clients) for m in EN_MONTHS]
+        m_real_vals = [sum(data_loader.clean_val(monthly_data[c][metric]["real"][m]) for c in filtered_clients) for m in EN_MONTHS]
         
         if "Ano" in viz_mode:
             # YTD accumulated monthly series
-            acc_plan += m_plan_val
-            if m_idx <= EN_MONTHS.index(month_sel_en):
-                acc_real += m_real_val
-                r_val = acc_real
-            else:
-                r_val = None
-                
-            p_val = acc_plan
-            
-            if chart_metric_key == "Ticket Médio":
-                ytd_gmv_plan = sum(data_loader.clean_val(monthly_data[c]["GMV"]["plan"][k]) for c in filtered_clients for k in EN_MONTHS[:m_idx + 1])
-                ytd_ped_plan = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["plan"][k]) for c in filtered_clients for k in EN_MONTHS[:m_idx + 1])
-                p_val = ytd_gmv_plan / ytd_ped_plan if ytd_ped_plan > 0 else 0.0
-                
-                if r_val is not None:
-                    ytd_gmv_real = sum(data_loader.clean_val(monthly_data[c]["GMV"]["real"][k]) for c in filtered_clients for k in EN_MONTHS[:m_idx + 1])
-                    ytd_ped_real = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["real"][k]) for c in filtered_clients for k in EN_MONTHS[:m_idx + 1])
-                    r_val = ytd_gmv_real / ytd_ped_real if ytd_ped_real > 0 else 0.0
-                    
-            y_plan.append(p_val)
-            y_real.append(r_val)
-            
-            if r_val is not None:
-                if chart_metric_key == "Ticket Médio":
-                    proj_val = r_val
+            acc_p = 0.0
+            acc_r = 0.0
+            for m_idx in range(12):
+                acc_p += m_plan_vals[m_idx]
+                y_p.append(acc_p)
+                if m_idx <= sel_i:
+                    acc_r += m_real_vals[m_idx]
+                    y_r.append(acc_r)
                 else:
-                    proj_val = (r_val / (m_idx + 1)) * 12
-                y_proj.append(proj_val)
-            else:
-                y_proj.append(None)
-        else:
-            # Consolidado do Mês
-            p_val = m_plan_val
-            r_val = m_real_val if m_idx <= EN_MONTHS.index(month_sel_en) else None
-            
-            if chart_metric_key == "Ticket Médio":
-                m_gmv_plan = sum(data_loader.clean_val(monthly_data[c]["GMV"]["plan"][m]) for c in filtered_clients)
-                m_ped_plan = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["plan"][m]) for c in filtered_clients)
-                p_val = m_gmv_plan / m_ped_plan if m_ped_plan > 0 else 0.0
-                
-                if r_val is not None:
-                    m_gmv_real = sum(data_loader.clean_val(monthly_data[c]["GMV"]["real"][m]) for c in filtered_clients)
-                    m_ped_real = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["real"][m]) for c in filtered_clients)
-                    r_val = m_gmv_real / m_ped_real if m_ped_real > 0 else 0.0
+                    y_r.append(None)
                     
-            y_plan.append(p_val)
-            y_real.append(r_val)
-            
-            if r_val is not None:
-                proj_val = r_val
-                y_proj.append(proj_val)
-            else:
-                y_proj.append(None)
+            avg_ritmo = y_r[sel_i] / (sel_i + 1) if (sel_i + 1) > 0 else 0.0
+            for m_idx in range(12):
+                if m_idx < sel_i:
+                    y_pr.append(None)
+                elif m_idx == sel_i:
+                    y_pr.append(y_r[sel_i])
+                else:
+                    y_pr.append(y_r[sel_i] + avg_ritmo * (m_idx - sel_i))
+        else:
+            # Consolidado do Mês (monthly non-accumulated)
+            for m_idx in range(12):
+                y_p.append(m_plan_vals[m_idx])
+                y_r.append(m_real_vals[m_idx] if m_idx <= sel_i else None)
+                
+            past_real = [v for v in m_real_vals[:sel_i+1] if v is not None]
+            avg_ritmo = sum(past_real) / len(past_real) if past_real else 0.0
+            for m_idx in range(12):
+                if m_idx < sel_i:
+                    y_pr.append(None)
+                elif m_idx == sel_i:
+                    y_pr.append(y_r[sel_i])
+                else:
+                    y_pr.append(avg_ritmo)
+                    
+    return x_lbls, y_p, y_r, y_pr
+
+# Compute the actual indicator series
+if chart_metric_key == "Ticket Médio":
+    x_labels, y_plan_gmv, y_real_gmv, y_proj_gmv = get_indicator_series("GMV")
+    _, y_plan_ped, y_real_ped, y_proj_ped = get_indicator_series("Pedidos")
+    
+    y_plan = [y_plan_gmv[i] / y_plan_ped[i] if y_plan_ped[i] > 0 else 0.0 for i in range(len(x_labels))]
+    y_real = [y_real_gmv[i] / y_real_ped[i] if y_real_ped[i] is not None and y_real_ped[i] > 0 else None for i in range(len(x_labels))]
+    y_proj = [y_proj_gmv[i] / y_proj_ped[i] if y_proj_ped[i] is not None and y_proj_ped[i] > 0 else None for i in range(len(x_labels))]
+else:
+    x_labels, y_plan, y_real, y_proj = get_indicator_series(chart_metric_key)
+
+# Identify index coordinates
+if has_weeks_data and "Ano" not in viz_mode:
+    selected_idx = selected_week_idx
+else:
+    selected_idx = EN_MONTHS.index(month_sel_en)
 
 # Calculate indicators for status annotations
-plan_last = y_plan[selected_idx]
+plan_real_last = y_plan[selected_idx]
 real_last = y_real[selected_idx] if y_real[selected_idx] is not None else 0.0
-proj_last = y_proj[selected_idx] if y_proj[selected_idx] is not None else 0.0
 
-if plan_last == 0:
+plan_proj_last = y_plan[-1]
+proj_last = y_proj[-1] if y_proj[-1] is not None else 0.0
+
+# Annotation labels and colors
+if plan_real_last == 0:
     real_gap_val = 0.0
     real_farol = "⚪"
     real_color = "#64748B"
     real_status_label = "Real x Planejado: - % ⚪"
-    
-    proj_gap_val = 0.0
-    proj_farol = "⚪"
-    proj_color = "#64748B"
-    proj_status_label = "Projeção x Planejado: - % ⚪"
 else:
-    real_ratio = real_last / plan_last
-    real_gap_val = ((real_last - plan_last) / plan_last) * 100
+    real_ratio = real_last / plan_real_last
+    real_gap_val = ((real_last - plan_real_last) / plan_real_last) * 100
     if real_ratio >= 1.0:
         real_farol = "🟢"
         real_color = "#166534"
@@ -805,52 +780,55 @@ else:
         real_farol = "🔴"
         real_color = "#991B1B"
     real_status_label = f"Real x Planejado: {real_gap_val:+.1f}% {real_farol}".replace(".", ",")
-        
-    proj_ratio = proj_last / plan_last
-    proj_gap_val = ((proj_last - plan_last) / plan_last) * 100
+
+if plan_proj_last == 0:
+    proj_gap_val = 0.0
+    proj_farol = "⚪"
+    proj_status_label = "Projeção x Planejado: - % ⚪"
+else:
+    proj_ratio = proj_last / plan_proj_last
+    proj_gap_val = ((proj_last - plan_proj_last) / plan_proj_last) * 100
     if proj_ratio >= 1.0:
         proj_farol = "🟢"
-        proj_color = "#166534"
     elif proj_ratio >= 0.90:
         proj_farol = "🟡"
-        proj_color = "#854D0E"
     else:
         proj_farol = "🔴"
-        proj_color = "#991B1B"
     proj_status_label = f"Projeção x Planejado: {proj_gap_val:+.1f}% {proj_farol}".replace(".", ",")
 
 # Compute shaded desvio areas
+# A) Real area: from start up to selected_idx
 valid_x = x_labels[:selected_idx+1]
 valid_plan = y_plan[:selected_idx+1]
 valid_real = [v if v is not None else 0.0 for v in y_real[:selected_idx+1]]
-valid_proj = [v if v is not None else 0.0 for v in y_proj[:selected_idx+1]]
 
-fill_x = valid_x + valid_x[::-1]
+fill_x_real = valid_x + valid_x[::-1]
 fill_y_real = valid_plan + valid_real[::-1]
-fill_y_proj = valid_plan + valid_proj[::-1]
 
-if plan_last == 0:
+if plan_real_last == 0:
     fill_color_real = 'rgba(100,116,139,0.04)'
+else:
+    fill_color_real = 'rgba(22, 101, 52, 0.08)' if real_last >= plan_real_last else 'rgba(153, 27, 27, 0.08)'
+
+# B) Projeção area: from selected_idx to end
+valid_proj_x = x_labels[selected_idx:]
+valid_proj_plan = y_plan[selected_idx:]
+valid_proj_val = [v if v is not None else 0.0 for v in y_proj[selected_idx:]]
+
+fill_x_proj = valid_proj_x + valid_proj_x[::-1]
+fill_y_proj = valid_proj_plan + valid_proj_val[::-1]
+
+if plan_proj_last == 0:
     fill_color_proj = 'rgba(100,116,139,0.02)'
 else:
-    fill_color_real = 'rgba(22, 101, 52, 0.08)' if real_last >= plan_last else 'rgba(153, 27, 27, 0.08)'
-    fill_color_proj = 'rgba(22, 101, 52, 0.04)' if proj_last >= plan_last else 'rgba(153, 27, 27, 0.04)'
+    fill_color_proj = 'rgba(22, 101, 52, 0.04)' if proj_last >= plan_proj_last else 'rgba(153, 27, 27, 0.04)'
 
 # Plotly Line Chart
 fig_ind = go.Figure()
 
-# Add Shaded Areas first so they are rendered in the background
+# Add Shaded Areas in the background
 fig_ind.add_trace(go.Scatter(
-    x=fill_x, y=fill_y_proj,
-    fill='toself',
-    fillcolor=fill_color_proj,
-    line=dict(color='rgba(0,0,0,0)'),
-    showlegend=False,
-    hoverinfo='skip'
-))
-
-fig_ind.add_trace(go.Scatter(
-    x=fill_x, y=fill_y_real,
+    x=fill_x_real, y=fill_y_real,
     fill='toself',
     fillcolor=fill_color_real,
     line=dict(color='rgba(0,0,0,0)'),
@@ -858,31 +836,48 @@ fig_ind.add_trace(go.Scatter(
     hoverinfo='skip'
 ))
 
-# Generate Tooltip Texts
+fig_ind.add_trace(go.Scatter(
+    x=fill_x_proj, y=fill_y_proj,
+    fill='toself',
+    fillcolor=fill_color_proj,
+    line=dict(color='rgba(0,0,0,0)'),
+    showlegend=False,
+    hoverinfo='skip'
+))
+
+# Generate custom tooltips for the lines
 tooltip_texts = []
-for idx_lbl, lbl in enumerate(x_labels):
-    p_val = y_plan[idx_lbl]
-    r_val = y_real[idx_lbl]
-    pr_val = y_proj[idx_lbl]
+for i, lbl in enumerate(x_labels):
+    p_val = y_plan[i]
+    r_val = y_real[i]
+    pr_val = y_proj[i]
     
-    if r_val is None:
-        tooltip_texts.append("")
-    else:
+    r_str = chart_fmt(r_val) if r_val is not None else "—"
+    pr_str = chart_fmt(pr_val) if pr_val is not None else "—"
+    
+    r_pct_str = "—"
+    r_f = ""
+    if r_val is not None:
         r_pct = ((r_val - p_val)/p_val)*100 if p_val > 0 else 0.0
-        pr_pct = ((pr_val - p_val)/p_val)*100 if p_val > 0 else 0.0
-        
+        r_pct_str = f"{r_pct:+.1f}%".replace(".", ",")
         r_f = "🟢" if p_val == 0 or (r_val/p_val) >= 1.0 else "🟡" if (r_val/p_val) >= 0.90 else "🔴"
+        
+    pr_pct_str = "—"
+    pr_f = ""
+    if pr_val is not None:
+        pr_pct = ((pr_val - p_val)/p_val)*100 if p_val > 0 else 0.0
+        pr_pct_str = f"{pr_pct:+.1f}%".replace(".", ",")
         pr_f = "🟢" if p_val == 0 or (pr_val/p_val) >= 1.0 else "🟡" if (pr_val/p_val) >= 0.90 else "🔴"
         
-        tooltip_texts.append(
-            f"Indicador: {sel_indicator}<br>"
-            f"Período: {lbl}<br>"
-            f"Planejado: {chart_fmt(p_val)}<br>"
-            f"Real: {chart_fmt(r_val)}<br>"
-            f"Projeção: {chart_fmt(pr_val)}<br>"
-            f"Real x Planejado: {r_pct:+.1f}% {r_f}<br>"
-            f"Projeção x Planejado: {pr_pct:+.1f}% {pr_f}"
-        )
+    tooltip_texts.append(
+        f"Indicador: {sel_indicator}<br>"
+        f"Período: {lbl}<br>"
+        f"Planejado: {chart_fmt(p_val)}<br>"
+        f"Real: {r_str}<br>"
+        f"Projeção: {pr_str}<br>"
+        f"Real x Planejado: {r_pct_str} {r_f}<br>"
+        f"Projeção x Planejado: {pr_pct_str} {pr_f}"
+    )
 
 # Add Lines
 fig_ind.add_trace(go.Scatter(
@@ -912,10 +907,9 @@ fig_ind.add_trace(go.Scatter(
     hovertemplate="%{text}<extra></extra>"
 ))
 
-# Add Status Annotations on the last available point
-last_lbl = x_labels[selected_idx]
+# Status annotations pointing to the respective points
 fig_ind.add_annotation(
-    x=last_lbl, y=real_last,
+    x=x_labels[selected_idx], y=real_last,
     text=real_status_label,
     showarrow=True,
     arrowhead=1,
@@ -928,7 +922,7 @@ fig_ind.add_annotation(
 )
 
 fig_ind.add_annotation(
-    x=last_lbl, y=proj_last,
+    x=x_labels[-1], y=proj_last,
     text=proj_status_label,
     showarrow=True,
     arrowhead=1,
@@ -940,7 +934,7 @@ fig_ind.add_annotation(
     borderpad=4
 )
 
-# Calculate dynamic axis scale
+# Dynamic axis scale range calculation
 all_visible_vals = [v for v in y_plan + [x for x in y_real if x is not None] + [x for x in y_proj if x is not None]]
 if all_visible_vals:
     ymin = min(all_visible_vals)
