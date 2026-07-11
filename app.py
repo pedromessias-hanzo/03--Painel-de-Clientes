@@ -152,59 +152,55 @@ st.markdown("""
         margin-bottom: 1rem;
     }
     
-    /* Responsive HTML Table styling with font size 13px */
+    /* Responsive HTML Table styling with font size 12-13px */
     .table-container {
         width: 100%;
         overflow-x: auto;
-        margin-bottom: 1rem;
+        margin-bottom: 0.75rem;
     }
     .compact-table {
         width: 100%;
         table-layout: fixed;
         border-collapse: collapse;
-        font-size: 13px !important;
-    }
-    .compact-table th {
-        background-color: #F8FAFC;
-        color: #475569;
-        font-weight: 700;
-        padding: 0.5rem;
-        border-bottom: 2px solid #CBD5E1;
+        font-size: 12.5px !important;
     }
     .compact-table td {
-        padding: 0.5rem;
-        border-bottom: 1px solid #E2E8F0;
+        padding: 5px 0.5rem;
+        height: 30px;
+        max-height: 30px;
+        border-bottom: 1px solid #F1F5F9;
         color: #0F172A;
     }
     .compact-table tr:hover {
         background-color: #F1F5F9;
     }
     
-    /* Specific column alignments and widths classes */
+    /* Specific column alignments classes */
     .col-rank {
-        width: 7%;
         text-align: center;
     }
     .col-client {
-        width: 30%;
         text-align: left;
         white-space: normal;
         word-wrap: break-word;
     }
     .col-curr {
-        width: 22%;
         text-align: right;
         white-space: nowrap;
     }
     .col-share {
-        width: 15%;
         text-align: right;
         white-space: nowrap;
     }
     .col-accum {
-        width: 26%;
         text-align: right;
         white-space: nowrap;
+    }
+    
+    /* Highlight Rank 1 */
+    .row-rank1 {
+        background-color: #F0FDF4 !important;
+        font-weight: 700 !important;
     }
     
     /* Table headers text color */
@@ -212,7 +208,7 @@ st.markdown("""
         font-size: 0.95rem;
         font-weight: 700;
         color: #475569;
-        margin-top: 0.75rem;
+        margin-top: 0.5rem;
         margin-bottom: 0.4rem;
         border-left: 3px solid #64748B;
         padding-left: 0.5rem;
@@ -427,7 +423,7 @@ def get_kpi_metrics(metric_key):
             # Pre-June months Consolidado Mode: Direct monthly consolidation from Planejamento sheet
             actual = m_real_month
             planned = m_plan_month
-            projection = m_real_month # No weekly projection rhythm for pre-June
+            projection = m_real_month
         else:
             weekly_cols_active = m_map_proj[month_sel_en]["weekly"]
             weights_row = df_proj.iloc[3]
@@ -571,7 +567,6 @@ quadrants_setup = [
     {"slot": row2_col2, "title": "TICKET MÉDIO", "key": "Ticket Médio", "fmt": fmt_currency, "is_ticket": True}
 ]
 
-# Map month-end column count for selected month in Projeção sheet
 total_weeks_sel = len(m_map_proj[month_sel_en]["weekly"]) if month_sel_en in m_map_proj else 0
 
 for quad in quadrants_setup:
@@ -581,9 +576,7 @@ for quad in quadrants_setup:
     client_data_list = []
     has_client_level_data = True
     
-    # Check if client-level actual data exists in selected mode / sheets
     if "YTD" in viz_mode:
-        # Validate that client-level YTD actual data exists in Planejamento
         total_ytd_real = sum(data_loader.clean_val(monthly_data[c][q_key]["real"][m]) for c in filtered_clients for m in months_up_to)
         if total_ytd_real == 0:
             has_client_level_data = False
@@ -605,9 +598,7 @@ for quad in quadrants_setup:
                     "client": client, "curr": curr_val, "accum": accum_val, "orders": orders_count
                 })
     else:
-        # Selected Month (consolidated Jan-May or weekly Jun-Dec)
         if not has_weeks_data:
-            # Pre-June months Consolidado Mode: Validate client-level monthly actual data in Planejamento
             total_real_month = sum(data_loader.clean_val(monthly_data[c][q_key]["real"][month_sel_en]) for c in filtered_clients)
             if total_real_month == 0:
                 has_client_level_data = False
@@ -629,11 +620,9 @@ for quad in quadrants_setup:
                         "client": client, "curr": curr_val, "accum": accum_val, "orders": orders_count
                     })
         else:
-            # June onwards: Load from Projeção weekly columns
             for client in filtered_clients:
                 target_m = data_loader.clean_val(weekly_data[client][q_key]["plan"][month_sel_en])
                 
-                # Check dynamic weights
                 weights_row = df_proj.iloc[3]
                 weekly_weights = [data_loader.clean_val(weights_row[col]) for col in weekly_cols]
                 sum_weights = sum(weekly_weights)
@@ -675,11 +664,9 @@ for quad in quadrants_setup:
                     "client": client, "curr": curr_val, "accum": accum_val, "orders": orders_count
                 })
 
-    # Sort Rankings strictly by absolute value
     group_curr_total = sum(c["curr"] for c in client_data_list)
     sorted_top = sorted(client_data_list, key=lambda x: (-x["curr"], x["client"]))
     
-    # Bottom 5 positive-only activity filter
     filtered_bottom = [r for r in client_data_list if r["curr"] > 0 and r["accum"] > 0 and r["client"].strip() != ""]
     sorted_bottom = sorted(filtered_bottom, key=lambda x: (x["curr"], x["client"]))
 
@@ -713,7 +700,6 @@ for quad in quadrants_setup:
     if diff_challenge is None:
         diff_challenge = target_val - accum_challenge
 
-    # Dynamic weeks left count
     if "YTD" in viz_mode:
         remaining_months_count = 11 - EN_MONTHS.index(month_sel_en)
         weeks_left_curr = len(weekly_cols) - (selected_week_idx + 1) if has_weeks_data else 0
@@ -754,32 +740,31 @@ for quad in quadrants_setup:
         st.markdown(f'<div class="quadrant-title">{quad["title"]}</div>', unsafe_allow_html=True)
         
         # 1. TOP 5 CLIENTS TABLE
-        tbl_top_title = "Top 5 Clientes do Mês" if not has_weeks_data else "Top 5 Clients"
+        tbl_top_title = "🏆 Top 5 Clientes do Mês" if not has_weeks_data else "🏆 Top 5 Clients"
         st.markdown(f'<div class="table-section-title">{tbl_top_title}</div>', unsafe_allow_html=True)
         
         if not has_client_level_data:
             msg_unavail = "Ranking YTD por cliente indisponível para este período." if "YTD" in viz_mode else "Ranking por cliente indisponível para este mês."
-            st.markdown(f'<div style="text-align:center; color:#64748B; font-size:13px; margin: 1rem 0;">{msg_unavail}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="text-align:center; color:#64748B; font-size:13px; margin: 0.5rem 0;">{msg_unavail}</div>', unsafe_allow_html=True)
         else:
             st.markdown(f'''
             <div class="table-container">
                 <table class="compact-table">
-                    <thead>
-                        <tr>
-                            <th class="col-rank">Rank</th>
-                            <th class="col-client">Cliente</th>
-                            <th class="col-curr">Valor Atual</th>
-                            <th class="col-share">{"Pedidos" if quad["is_ticket"] else "Share %"}</th>
-                            <th class="col-accum">{"Ticket Acumulado" if quad["is_ticket"] else "Valor Acumulado"}</th>
-                        </tr>
-                    </thead>
+                    <colgroup>
+                        <col style="width: 6%;">
+                        <col style="width: 36%;">
+                        <col style="width: 24%;">
+                        <col style="width: 12%;">
+                        <col style="width: 22%;">
+                    </colgroup>
                     <tbody>
             ''', unsafe_allow_html=True)
             
             for idx, row in enumerate(sorted_top[:5]):
                 share_str = f"{row['orders']:.0f}" if quad["is_ticket"] else (f"{(row['curr']/group_curr_total)*100:.1f}%" if group_curr_total > 0 else "0.0%")
+                row_class = "row-rank1" if idx == 0 else ""
                 st.markdown(f'''
-                        <tr>
+                        <tr class="{row_class}">
                             <td class="col-rank"><b>{idx+1}</b></td>
                             <td class="col-client">{row["client"]}</td>
                             <td class="col-curr">{quad["fmt"](row["curr"])}</td>
@@ -789,35 +774,34 @@ for quad in quadrants_setup:
                 ''', unsafe_allow_html=True)
             st.markdown('</tbody></table></div>', unsafe_allow_html=True)
             
-        st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
+        st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
         
         # 2. BOTTOM 5 CLIENTS TABLE
-        tbl_bot_title = "Bottom 5 Clientes com Movimentação no Mês" if not has_weeks_data else "Bottom 5 Clients with Activity"
+        tbl_bot_title = "📉 Bottom 5 Clientes com Movimentação no Mês" if not has_weeks_data else "📉 Bottom 5 Clients with Activity"
         st.markdown(f'<div class="table-section-title">{tbl_bot_title}</div>', unsafe_allow_html=True)
         
         if not has_client_level_data:
             msg_unavail = "Ranking YTD por cliente indisponível para este período." if "YTD" in viz_mode else "Ranking por cliente indisponível para este mês."
-            st.markdown(f'<div style="text-align:center; color:#64748B; font-size:13px; margin: 1rem 0;">{msg_unavail}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="text-align:center; color:#64748B; font-size:13px; margin: 0.5rem 0;">{msg_unavail}</div>', unsafe_allow_html=True)
         else:
             st.markdown(f'''
             <div class="table-container">
                 <table class="compact-table">
-                    <thead>
-                        <tr>
-                            <th class="col-rank">Rank</th>
-                            <th class="col-client">Cliente</th>
-                            <th class="col-curr">Valor Atual</th>
-                            <th class="col-share">{"Pedidos" if quad["is_ticket"] else "Share %"}</th>
-                            <th class="col-accum">{"Ticket Acumulado" if quad["is_ticket"] else "Valor Acumulado"}</th>
-                        </tr>
-                    </thead>
+                    <colgroup>
+                        <col style="width: 6%;">
+                        <col style="width: 36%;">
+                        <col style="width: 24%;">
+                        <col style="width: 12%;">
+                        <col style="width: 22%;">
+                    </colgroup>
                     <tbody>
             ''', unsafe_allow_html=True)
             
             for idx, row in enumerate(sorted_bottom[:5]):
                 share_str = f"{row['orders']:.0f}" if quad["is_ticket"] else (f"{(row['curr']/group_curr_total)*100:.1f}%" if group_curr_total > 0 else "0.0%")
+                row_class = "row-rank1" if idx == 0 else ""
                 st.markdown(f'''
-                        <tr>
+                        <tr class="{row_class}">
                             <td class="col-rank"><b>{idx+1}</b></td>
                             <td class="col-client">{row["client"]}</td>
                             <td class="col-curr">{quad["fmt"](row["curr"])}</td>
@@ -827,17 +811,16 @@ for quad in quadrants_setup:
                 ''', unsafe_allow_html=True)
                 
             if not sorted_bottom:
-                st.markdown('<tr><td colspan="5" style="text-align:center; color:#64748B; padding: 1rem 0;">Nenhum cliente ativo no período.</td></tr>', unsafe_allow_html=True)
+                st.markdown('<tr><td colspan="5" style="text-align:center; color:#64748B; padding: 0.5rem 0;">Nenhum cliente ativo no período.</td></tr>', unsafe_allow_html=True)
             st.markdown('</tbody></table></div>', unsafe_allow_html=True)
             
-        st.markdown('<div style="height:20px;"></div>', unsafe_allow_html=True)
+        st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
         
-        # 3. EVOLUTION CHART (January to December MoM - from Planejamento)
+        # 3. EVOLUTION CHART
         st.markdown(f'<div class="table-section-title">Evolução Histórica</div>', unsafe_allow_html=True)
         
         fig = go.Figure()
         
-        # Pull MoM values Jan to Dec using ONLY Planejamento sheet
         plan_MoM = []
         real_MoM = []
         
@@ -859,7 +842,6 @@ for quad in quadrants_setup:
                 cl_real = 0.0
                 
             plan_MoM.append(cl_plan)
-            # Only append real value if month is completed or selected month containing data
             if cl_real > 0 or m == month_sel_en:
                 real_MoM.append(cl_real)
             else:
@@ -872,13 +854,12 @@ for quad in quadrants_setup:
             x=PT_MONTHS, y=real_MoM, name="Realizado", line=dict(color="#166534", width=2.5), connectgaps=False
         ))
         
-        # Highlight selected month visually with marker (without duplicate legend item)
         sel_idx = EN_MONTHS.index(month_sel_en)
         sel_val = real_MoM[sel_idx] if real_MoM[sel_idx] is not None else plan_MoM[sel_idx]
         fig.add_trace(go.Scatter(
             x=[PT_MONTHS[sel_idx]], y=[sel_val],
             marker=dict(color="#D97706", size=10, line=dict(color="#FFFFFF", width=2)),
-            showlegend=False # Prevents duplicate item in legend
+            showlegend=False
         ))
         
         fig.update_layout(
@@ -893,7 +874,7 @@ for quad in quadrants_setup:
         )
         
         st.plotly_chart(fig, use_container_width=True)
-        st.markdown('<div style="height:15px;"></div>', unsafe_allow_html=True)
+        st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
         
         # 4. CHALLENGE TO TARGET CARD
         st.markdown(f'''
@@ -918,4 +899,4 @@ for quad in quadrants_setup:
         ''', unsafe_allow_html=True)
         
         st.markdown('</div>', unsafe_allow_html=True)
-        st.markdown('<div style="height:20px;"></div>', unsafe_allow_html=True)
+        st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
