@@ -192,10 +192,6 @@ st.markdown("""
         text-align: right;
         white-space: nowrap;
     }
-    .col-accum {
-        text-align: right;
-        white-space: nowrap;
-    }
     
     /* Highlight Rank 1 */
     .row-rank1 {
@@ -420,7 +416,6 @@ def get_kpi_metrics(metric_key):
         m_real_month = sum(data_loader.clean_val(monthly_data[c][metric_key]["real"][month_sel_en]) for c in filtered_clients)
         
         if not has_weeks_data:
-            # Pre-June months Consolidado Mode: Direct monthly consolidation from Planejamento sheet
             actual = m_real_month
             planned = m_plan_month
             projection = m_real_month
@@ -744,24 +739,23 @@ for quad in quadrants_setup:
         st.markdown(f'<div class="table-section-title">{tbl_top_title}</div>', unsafe_allow_html=True)
         
         if not has_client_level_data:
-            msg_unavail = "Ranking YTD por cliente indisponível para este período." if "YTD" in viz_mode else "Ranking por cliente indisponível para este mês."
+            msg_unavail = "Ranking YTD por client indisponível para este período." if "YTD" in viz_mode else "Ranking por cliente indisponível para este mês."
             st.markdown(f'<div style="text-align:center; color:#64748B; font-size:13px; margin: 0.5rem 0;">{msg_unavail}</div>', unsafe_allow_html=True)
         else:
             st.markdown(f'''
             <div class="table-container">
                 <table class="compact-table">
                     <colgroup>
-                        <col style="width: 6%;">
-                        <col style="width: 36%;">
+                        <col style="width: 8%;">
+                        <col style="width: 54%;">
                         <col style="width: 24%;">
-                        <col style="width: 12%;">
-                        <col style="width: 22%;">
+                        <col style="width: 14%;">
                     </colgroup>
                     <tbody>
             ''', unsafe_allow_html=True)
             
             for idx, row in enumerate(sorted_top[:5]):
-                share_str = f"{row['orders']:.0f}" if quad["is_ticket"] else (f"{(row['curr']/group_curr_total)*100:.1f}%" if group_curr_total > 0 else "0.0%")
+                share_str = f"{(row['curr']/group_curr_total)*100:.1f}%" if group_curr_total > 0 else "0.0%"
                 row_class = "row-rank1" if idx == 0 else ""
                 st.markdown(f'''
                         <tr class="{row_class}">
@@ -769,7 +763,6 @@ for quad in quadrants_setup:
                             <td class="col-client">{row["client"]}</td>
                             <td class="col-curr">{quad["fmt"](row["curr"])}</td>
                             <td class="col-share">{share_str}</td>
-                            <td class="col-accum">{quad["fmt"](row["accum"])}</td>
                         </tr>
                 ''', unsafe_allow_html=True)
             st.markdown('</tbody></table></div>', unsafe_allow_html=True)
@@ -781,24 +774,23 @@ for quad in quadrants_setup:
         st.markdown(f'<div class="table-section-title">{tbl_bot_title}</div>', unsafe_allow_html=True)
         
         if not has_client_level_data:
-            msg_unavail = "Ranking YTD por cliente indisponível para este período." if "YTD" in viz_mode else "Ranking por cliente indisponível para este mês."
+            msg_unavail = "Ranking YTD por client indisponível para este período." if "YTD" in viz_mode else "Ranking por cliente indisponível para este mês."
             st.markdown(f'<div style="text-align:center; color:#64748B; font-size:13px; margin: 0.5rem 0;">{msg_unavail}</div>', unsafe_allow_html=True)
         else:
             st.markdown(f'''
             <div class="table-container">
                 <table class="compact-table">
                     <colgroup>
-                        <col style="width: 6%;">
-                        <col style="width: 36%;">
+                        <col style="width: 8%;">
+                        <col style="width: 54%;">
                         <col style="width: 24%;">
-                        <col style="width: 12%;">
-                        <col style="width: 22%;">
+                        <col style="width: 14%;">
                     </colgroup>
                     <tbody>
             ''', unsafe_allow_html=True)
             
             for idx, row in enumerate(sorted_bottom[:5]):
-                share_str = f"{row['orders']:.0f}" if quad["is_ticket"] else (f"{(row['curr']/group_curr_total)*100:.1f}%" if group_curr_total > 0 else "0.0%")
+                share_str = f"{(row['curr']/group_curr_total)*100:.1f}%" if group_curr_total > 0 else "0.0%"
                 row_class = "row-rank1" if idx == 0 else ""
                 st.markdown(f'''
                         <tr class="{row_class}">
@@ -806,12 +798,11 @@ for quad in quadrants_setup:
                             <td class="col-client">{row["client"]}</td>
                             <td class="col-curr">{quad["fmt"](row["curr"])}</td>
                             <td class="col-share">{share_str}</td>
-                            <td class="col-accum">{quad["fmt"](row["accum"])}</td>
                         </tr>
                 ''', unsafe_allow_html=True)
                 
             if not sorted_bottom:
-                st.markdown('<tr><td colspan="5" style="text-align:center; color:#64748B; padding: 0.5rem 0;">Nenhum cliente ativo no período.</td></tr>', unsafe_allow_html=True)
+                st.markdown('<tr><td colspan="4" style="text-align:center; color:#64748B; padding: 0.5rem 0;">Nenhum cliente ativo no período.</td></tr>', unsafe_allow_html=True)
             st.markdown('</tbody></table></div>', unsafe_allow_html=True)
             
         st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
