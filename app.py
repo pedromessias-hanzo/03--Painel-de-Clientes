@@ -877,7 +877,17 @@ for quad in quadrants_setup:
         st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
         
         # 4. TOP 5 EVOLUTION LINE CHART (Planejamento Jan-Dec)
-        st.markdown('<div class="table-section-title">Evolução Mensal - Top 5 Clientes</div>', unsafe_allow_html=True)
+        # Title based on mode
+        if "Ano" in viz_mode:
+            chart_top_title = f"Evolução Mensal - Top 5 Clientes YTD | Até {month_sel_pt}/2026"
+        elif "Mês" in viz_mode:
+            chart_top_title = f"Evolução Mensal - Top 5 Clientes MTD | Até {month_sel_pt}/2026"
+        elif "Semana" in viz_mode:
+            chart_top_title = f"Evolução Mensal - Top 5 Clientes da {week_sel_label} | Até {month_sel_pt}/2026"
+        else:
+            chart_top_title = f"Evolução Mensal - Top 5 Clientes | Até {month_sel_pt}/2026"
+            
+        st.markdown(f'<div class="table-section-title">{chart_top_title}</div>', unsafe_allow_html=True)
         st.markdown('<div style="font-size:0.8rem; color:#64748B; margin-top:-0.5rem; margin-bottom:0.5rem;">Clique na legenda para destacar ou ocultar clientes.</div>', unsafe_allow_html=True)
         
         top_names_list = [row["client"] for row in sorted_top[:5]] if has_client_level_data and sorted_top else []
@@ -892,15 +902,16 @@ for quad in quadrants_setup:
         top_palette = ['#1f77b4', '#2ca02c', '#ff7f0e', '#9467bd', '#d62728']
         symbols_list = ['circle', 'square', 'diamond', 'cross', 'x']
         
-        # Calculate Y scale range dynamically
+        # Calculate Y scale range dynamically based only on months up to selected
         all_top_vals = []
         if has_client_level_data and sorted_top:
             for row in sorted_top[:5]:
                 client = row["client"]
-                for m in EN_MONTHS:
-                    v = data_loader.clean_val(monthly_data[client][q_key]["real"][m])
-                    if v > 0:
-                        all_top_vals.append(v)
+                for m_idx, m in enumerate(EN_MONTHS):
+                    if m_idx <= EN_MONTHS.index(month_sel_en):
+                        v = data_loader.clean_val(monthly_data[client][q_key]["real"][m])
+                        if v > 0:
+                            all_top_vals.append(v)
                         
         if all_top_vals:
             y_min = min(all_top_vals)
@@ -934,30 +945,31 @@ for quad in quadrants_setup:
                 y_vals = []
                 tooltip_texts = []
                 for m_idx, m in enumerate(EN_MONTHS):
-                    m_val = data_loader.clean_val(monthly_data[client][q_key]["real"][m])
-                    m_total = sum(data_loader.clean_val(monthly_data[c][q_key]["real"][m]) for c in filtered_clients)
-                    m_share = (m_val / m_total) * 100 if m_total > 0 else 0.0
-                    
-                    if m_val > 0 or m == month_sel_en:
+                    if m_idx <= EN_MONTHS.index(month_sel_en):
+                        m_val = data_loader.clean_val(monthly_data[client][q_key]["real"][m])
                         y_vals.append(m_val)
+                        
+                        m_total = sum(data_loader.clean_val(monthly_data[c][q_key]["real"][m]) for c in filtered_clients)
+                        m_share = (m_val / m_total) * 100 if m_total > 0 else 0.0
+                        
+                        # Calculate MoM variation
+                        var_str = "—"
+                        if m_idx > 0:
+                            prev_m = EN_MONTHS[m_idx - 1]
+                            prev_v = data_loader.clean_val(monthly_data[client][q_key]["real"][prev_m])
+                            if prev_v > 0:
+                                mom_var = ((m_val - prev_v) / prev_v) * 100
+                                var_str = f"{mom_var:+.1f}%".replace(".", ",")
+                                
+                        tooltip_texts.append(
+                            f"Cliente: {client}<br>"
+                            f"Mês: {PT_MONTH_DISPLAY[m]}<br>"
+                            f"{short_label}: {quad['fmt'](m_val)}<br>"
+                            f"Variação mensal: {var_str}"
+                        )
                     else:
                         y_vals.append(None)
-                        
-                    # Calculate MoM variation
-                    var_str = "—"
-                    if m_idx > 0:
-                        prev_m = EN_MONTHS[m_idx - 1]
-                        prev_v = data_loader.clean_val(monthly_data[client][q_key]["real"][prev_m])
-                        if prev_v > 0:
-                            mom_var = ((m_val - prev_v) / prev_v) * 100
-                            var_str = f"{mom_var:+.1f}%".replace(".", ",")
-                            
-                    tooltip_texts.append(
-                        f"Cliente: {client}<br>"
-                        f"Mês: {PT_MONTH_DISPLAY[m]}<br>"
-                        f"{short_label}: {quad['fmt'](m_val)}<br>"
-                        f"Variação mensal: {var_str}"
-                    )
+                        tooltip_texts.append("")
                     
                 fig_top.add_trace(go.Scatter(
                     x=PT_MONTHS,
@@ -967,7 +979,7 @@ for quad in quadrants_setup:
                     opacity=trace_opacity,
                     line=dict(color=color, width=trace_width),
                     marker=dict(
-                        size=[10 if m == month_sel_en else 6 for m in EN_MONTHS],
+                        size=[12 if m == month_sel_en else 6 for m in EN_MONTHS],
                         color=['#D97706' if m == month_sel_en else color for m in EN_MONTHS],
                         symbol=symbol,
                         line=dict(color='#FFFFFF', width=1.5)
@@ -996,126 +1008,6 @@ for quad in quadrants_setup:
             yaxis=dict(showgrid=True, gridcolor="#F1F5F9", range=range_y_top) if range_y_top else dict(showgrid=True, gridcolor="#F1F5F9")
         )
         st.plotly_chart(fig_top, use_container_width=True)
-        st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
-        
-        # 5. BOTTOM 5 EVOLUTION LINE CHART (Planejamento Jan-Dec)
-        st.markdown('<div class="table-section-title">Evolução Mensal - Bottom 5 Clientes</div>', unsafe_allow_html=True)
-        st.markdown('<div style="font-size:0.8rem; color:#64748B; margin-top:-0.5rem; margin-bottom:0.5rem;">Clique na legenda para destacar ou ocultar clientes.</div>', unsafe_allow_html=True)
-        
-        bot_names_list = [row["client"] for row in sorted_bottom[:5]] if has_client_level_data and sorted_bottom else []
-        sel_bot = st.selectbox(
-            "Cliente em destaque",
-            ["Todos"] + bot_names_list,
-            key=f"sel_highlight_{q_key}_bot"
-        )
-        
-        fig_bot = go.Figure()
-        # High-contrast categorical palette (e.g. Teal, Dark Gray, Magenta, Brown, Olive/Cyan)
-        bot_palette = ['#17becf', '#7f7f7f', '#e377c2', '#8c564b', '#bcbd22']
-        symbols_list = ['circle', 'square', 'diamond', 'cross', 'x']
-        
-        # Calculate Y scale range dynamically
-        all_bot_vals = []
-        if has_client_level_data and sorted_bottom:
-            for row in sorted_bottom[:5]:
-                client = row["client"]
-                for m in EN_MONTHS:
-                    v = data_loader.clean_val(monthly_data[client][q_key]["real"][m])
-                    if v > 0:
-                        all_bot_vals.append(v)
-                        
-        if all_bot_vals:
-            y_min = min(all_bot_vals)
-            y_max = max(all_bot_vals)
-            margem = (y_max - y_min) * 0.10
-            if margem == 0:
-                margem = y_max * 0.10 if y_max > 0 else 1.0
-            range_y_bot = [max(0.0, y_min - margem), y_max + margem]
-        else:
-            range_y_bot = None
-            
-        if has_client_level_data and sorted_bottom:
-            for c_idx, row in enumerate(sorted_bottom[:5]):
-                client = row["client"]
-                color = bot_palette[c_idx % len(bot_palette)]
-                symbol = symbols_list[c_idx % len(symbols_list)]
-                
-                # Determine opacity and line width based on highlighting
-                if sel_bot == "Todos":
-                    trace_opacity = 0.95
-                    trace_width = 3.0
-                elif client == sel_bot:
-                    trace_opacity = 1.0
-                    trace_width = 4.0
-                else:
-                    trace_opacity = 0.20
-                    trace_width = 1.5
-                    
-                y_vals = []
-                tooltip_texts = []
-                for m_idx, m in enumerate(EN_MONTHS):
-                    m_val = data_loader.clean_val(monthly_data[client][q_key]["real"][m])
-                    m_total = sum(data_loader.clean_val(monthly_data[c][q_key]["real"][m]) for c in filtered_clients)
-                    m_share = (m_val / m_total) * 100 if m_total > 0 else 0.0
-                    
-                    if m_val > 0 or m == month_sel_en:
-                        y_vals.append(m_val)
-                    else:
-                        y_vals.append(None)
-                        
-                    # Calculate MoM variation
-                    var_str = "—"
-                    if m_idx > 0:
-                        prev_m = EN_MONTHS[m_idx - 1]
-                        prev_v = data_loader.clean_val(monthly_data[client][q_key]["real"][prev_m])
-                        if prev_v > 0:
-                            mom_var = ((m_val - prev_v) / prev_v) * 100
-                            var_str = f"{mom_var:+.1f}%".replace(".", ",")
-                            
-                    tooltip_texts.append(
-                        f"Cliente: {client}<br>"
-                        f"Mês: {PT_MONTH_DISPLAY[m]}<br>"
-                        f"{short_label}: {quad['fmt'](m_val)}<br>"
-                        f"Variação mensal: {var_str}"
-                    )
-                    
-                fig_bot.add_trace(go.Scatter(
-                    x=PT_MONTHS,
-                    y=y_vals,
-                    name=client,
-                    mode='lines+markers',
-                    opacity=trace_opacity,
-                    line=dict(color=color, width=trace_width),
-                    marker=dict(
-                        size=[10 if m == month_sel_en else 6 for m in EN_MONTHS],
-                        color=['#D97706' if m == month_sel_en else color for m in EN_MONTHS],
-                        symbol=symbol,
-                        line=dict(color='#FFFFFF', width=1.5)
-                    ),
-                    text=tooltip_texts,
-                    hovertemplate="%{text}<extra></extra>"
-                ))
-                
-        fig_bot.update_layout(
-            height=280,
-            margin=dict(l=10, r=10, t=10, b=10),
-            showlegend=True,
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.12,
-                xanchor="center",
-                x=0.5,
-                font=dict(size=11),
-                itemclick="toggle",
-                itemdoubleclick="toggleothers"
-            ),
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            xaxis=dict(showgrid=True, gridcolor="#F1F5F9"),
-            yaxis=dict(showgrid=True, gridcolor="#F1F5F9", range=range_y_bot) if range_y_bot else dict(showgrid=True, gridcolor="#F1F5F9")
-        )
-        st.plotly_chart(fig_bot, use_container_width=True)
         st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
         
         # 6. CHALLENGE TO TARGET CARD (Projeção)
