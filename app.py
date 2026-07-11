@@ -152,18 +152,22 @@ st.markdown("""
         margin-bottom: 1rem;
     }
     
-    /* Table styling with font size 13px */
+    /* Responsive HTML Table styling with font size 13px */
+    .table-container {
+        width: 100%;
+        overflow-x: auto;
+        margin-bottom: 1rem;
+    }
     .compact-table {
         width: 100%;
+        table-layout: fixed;
         border-collapse: collapse;
         font-size: 13px !important;
-        margin-bottom: 1rem;
     }
     .compact-table th {
         background-color: #F8FAFC;
         color: #475569;
         font-weight: 700;
-        text-align: left;
         padding: 0.5rem;
         border-bottom: 2px solid #CBD5E1;
     }
@@ -174,6 +178,33 @@ st.markdown("""
     }
     .compact-table tr:hover {
         background-color: #F1F5F9;
+    }
+    
+    /* Specific column alignments and widths classes */
+    .col-rank {
+        width: 7%;
+        text-align: center;
+    }
+    .col-client {
+        width: 30%;
+        text-align: left;
+        white-space: normal;
+        word-wrap: break-word;
+    }
+    .col-curr {
+        width: 22%;
+        text-align: right;
+        white-space: nowrap;
+    }
+    .col-share {
+        width: 15%;
+        text-align: right;
+        white-space: nowrap;
+    }
+    .col-accum {
+        width: 26%;
+        text-align: right;
+        white-space: nowrap;
     }
     
     /* Table headers text color */
@@ -281,61 +312,57 @@ else:
 available_months_en = [m for m in EN_MONTHS if m in m_map_proj and len(m_map_proj[m]["weekly"]) > 0]
 available_months_pt = [PT_MONTH_DISPLAY[m] for m in available_months_en]
 
-if not available_months_en:
-    st.error("Nenhum mês com monitoramento semanal encontrado na planilha.")
-    st.stop()
+# Month selection filter contains Jan-Dec chronologically
+month_sel_pt = st.selectbox(
+    "Mês",
+    PT_MONTHS,
+    index=PT_MONTHS.index("Julho") # Default July
+)
+month_sel_en = PT_TO_EN[month_sel_pt]
 
-# Default Month (latest with actuals > 0)
-default_month_en = available_months_en[-1]
-for m in reversed(available_months_en):
-    has_data = False
-    for w_idx in range(len(m_map_proj[m]["weekly"])):
-        w_sum = sum(data_loader.clean_val(weekly_data[c]["GMV"]["weekly"][m][w_idx]) for c in weekly_data)
-        if w_sum > 0:
-            has_data = True
-            break
-    if has_data:
-        default_month_en = m
-        break
-default_month_pt = PT_MONTH_DISPLAY[default_month_en]
-
-# 1. FILTERS ROW
-col_m_filt, col_w_filt, col_mode_filt, col_g_filt, col_ref = st.columns([1.5, 1.5, 1.8, 1.8, 1])
-
-with col_m_filt:
-    month_sel_pt = st.selectbox(
-        "Mês",
-        available_months_pt,
-        index=available_months_pt.index(default_month_pt)
-    )
-    month_sel_en = PT_TO_EN[month_sel_pt]
-
-# Determine week options for the selected month
-weekly_cols = m_map_proj[month_sel_en]["weekly"]
+# Determine week options dynamically for June onward (if weekly data exists)
+has_weeks_data = (month_sel_en in m_map_proj and len(m_map_proj[month_sel_en]["weekly"]) > 0)
+weekly_cols = m_map_proj[month_sel_en]["weekly"] if has_weeks_data else []
 num_weeks = len(weekly_cols)
 week_options = [f"Semana {i+1}" for i in range(num_weeks)]
 
 # Determine default week (latest week in that month with actuals > 0)
 default_week_idx = 0
-for w_idx in reversed(range(num_weeks)):
-    w_sum = sum(data_loader.clean_val(weekly_data[c]["GMV"]["weekly"][month_sel_en][w_idx]) for c in weekly_data)
-    if w_sum > 0:
-        default_week_idx = w_idx
-        break
+if has_weeks_data:
+    for w_idx in reversed(range(num_weeks)):
+        w_sum = sum(data_loader.clean_val(weekly_data[c]["GMV"]["weekly"][month_sel_en][w_idx]) for c in weekly_data)
+        if w_sum > 0:
+            default_week_idx = w_idx
+            break
+
+# Render conditional Week Filter
+col_w_filt, col_mode_filt, col_g_filt, col_ref = st.columns([1.5, 2, 2, 1])
 
 with col_w_filt:
-    week_sel_label = st.selectbox(
-        "Semana",
-        week_options,
-        index=default_week_idx
-    )
-    selected_week_idx = week_options.index(week_sel_label)
+    if has_weeks_data:
+        week_sel_label = st.selectbox(
+            "Semana",
+            week_options,
+            index=default_week_idx
+        )
+        selected_week_idx = week_options.index(week_sel_label)
+    else:
+        st.selectbox("Semana", ["Sem divisão semanal"], disabled=True)
+        selected_week_idx = 0
+
+# Determine mode options dynamically
+if has_weeks_data:
+    mode_options = ["📅 Selected Week", "📈 Month To Date (MTD)", "🏆 Year To Date (YTD)"]
+    default_mode_idx = 1 # MTD
+else:
+    mode_options = ["📈 Consolidado do Mês", "🏆 Year To Date (YTD)"]
+    default_mode_idx = 0 # Consolidado do Mês
 
 with col_mode_filt:
     viz_mode = st.selectbox(
         "Modo de Visualização",
-        ["📅 Selected Week", "📈 Month To Date (MTD)", "🏆 Year To Date (YTD)"],
-        index=1 # Default MTD
+        mode_options,
+        index=default_mode_idx
     )
 
 with col_g_filt:
@@ -394,34 +421,41 @@ def get_kpi_metrics(metric_key):
         projection = (actual / K_m) * 12
     else:
         m_plan_month = sum(data_loader.clean_val(monthly_data[c][metric_key]["plan"][month_sel_en]) for c in filtered_clients)
+        m_real_month = sum(data_loader.clean_val(monthly_data[c][metric_key]["real"][month_sel_en]) for c in filtered_clients)
         
-        weekly_cols_active = m_map_proj[month_sel_en]["weekly"]
-        weights_row = df_proj.iloc[3]
-        weekly_weights = [data_loader.clean_val(weights_row[col]) for col in weekly_cols_active]
-        sum_weights = sum(weekly_weights)
-        if sum_weights == 0:
-            weekly_weights = [1.0 / len(weekly_cols_active)] * len(weekly_cols_active)
+        if not has_weeks_data:
+            # Pre-June months Consolidado Mode: Direct monthly consolidation from Planejamento sheet
+            actual = m_real_month
+            planned = m_plan_month
+            projection = m_real_month # No weekly projection rhythm for pre-June
         else:
-            weekly_weights = [w / sum_weights for w in weekly_weights]
-            
-        elapsed_w = 0
-        for w in range(selected_week_idx + 1):
-            w_sum = sum(data_loader.clean_val(weekly_data[c]["GMV"]["weekly"][month_sel_en][w]) for c in weekly_data)
-            if w_sum > 0:
-                elapsed_w += 1
-        K_w = max(1, elapsed_w)
-        
-        if "Week" in viz_mode:
-            for c in filtered_clients:
-                actual += data_loader.clean_val(weekly_data[c][metric_key]["weekly"][month_sel_en][selected_week_idx])
-            planned = m_plan_month * weekly_weights[selected_week_idx]
-            projection = (actual / 1) * len(weekly_cols_active)
-        else:
+            weekly_cols_active = m_map_proj[month_sel_en]["weekly"]
+            weights_row = df_proj.iloc[3]
+            weekly_weights = [data_loader.clean_val(weights_row[col]) for col in weekly_cols_active]
+            sum_weights = sum(weekly_weights)
+            if sum_weights == 0:
+                weekly_weights = [1.0 / len(weekly_cols_active)] * len(weekly_cols_active)
+            else:
+                weekly_weights = [w / sum_weights for w in weekly_weights]
+                
+            elapsed_w = 0
             for w in range(selected_week_idx + 1):
+                w_sum = sum(data_loader.clean_val(weekly_data[c]["GMV"]["weekly"][month_sel_en][w]) for c in weekly_data)
+                if w_sum > 0:
+                    elapsed_w += 1
+            K_w = max(1, elapsed_w)
+            
+            if "Week" in viz_mode:
                 for c in filtered_clients:
-                    actual += data_loader.clean_val(weekly_data[c][metric_key]["weekly"][month_sel_en][w])
-            planned = m_plan_month * sum(weekly_weights[:selected_week_idx + 1])
-            projection = (actual / K_w) * len(weekly_cols_active)
+                    actual += data_loader.clean_val(weekly_data[c][metric_key]["weekly"][month_sel_en][selected_week_idx])
+                planned = m_plan_month * weekly_weights[selected_week_idx]
+                projection = (actual / 1) * len(weekly_cols_active)
+            else:
+                for w in range(selected_week_idx + 1):
+                    for c in filtered_clients:
+                        actual += data_loader.clean_val(weekly_data[c][metric_key]["weekly"][month_sel_en][w])
+                planned = m_plan_month * sum(weekly_weights[:selected_week_idx + 1])
+                projection = (actual / K_w) * len(weekly_cols_active)
             
     if metric_key == "Ticket Médio":
         actual_gmv, planned_gmv, proj_gmv = get_kpi_metrics("GMV")
@@ -450,7 +484,7 @@ kpis_values = {
 kpi_achievements = []
 for k, v in kpis_values.items():
     if v["plan"] > 0:
-        ach = v["proj"] / v["plan"] if "YTD" in viz_mode or "MTD" in viz_mode else v["actual"] / v["plan"]
+        ach = v["proj"] / v["plan"] if "YTD" in viz_mode or "MTD" in viz_mode or not has_weeks_data else v["actual"] / v["plan"]
     else:
         ach = 0.0
     kpi_achievements.append(ach)
@@ -463,32 +497,7 @@ elif avg_kpi_ach >= 0.90:
 else:
     overall_farol, overall_status, badge_class = "🔴", "Abaixo da Meta", "status-red"
 
-# Header Row
-col_title, col_status = st.columns([3, 1])
-with col_title:
-    st.markdown(f'''
-    <div class="cockpit-header">
-        <h1 class="cockpit-title">HANZO DO BRASIL</h1>
-        <div class="cockpit-subtitle">
-            Mês: <b>{month_sel_pt} 2026</b> | 
-            Semana: <b>{week_sel_label}</b> | 
-            Modo: <b>{viz_mode[2:]}</b> | 
-            Grupo: <b>{group_filter}</b> | 
-            Última Atualização: {last_modified.strftime("%d/%m/%Y %H:%M:%S")}
-        </div>
-    </div>
-    ''', unsafe_allow_html=True)
-
-with col_status:
-    st.markdown(f'''
-    <div class="status-badge-container">
-        <div class="status-badge {badge_class}">
-            STATUS DO MÊS: {overall_farol} {overall_status}
-        </div>
-    </div>
-    ''', unsafe_allow_html=True)
-
-# 2. EXECUTIVE KPI CARDS ROW (at the top)
+# Top KPIs Row
 col_c1, col_c2, col_c3, col_c4 = st.columns(4)
 
 kpis_setup = [
@@ -502,7 +511,6 @@ for card in kpis_setup:
     k_key = card["key"]
     c_vals = kpis_values[k_key]
     
-    # Gap % calculation
     if c_vals["plan"] == 0:
         gap_pct_str = "Meta não definida"
         card_farol = "—"
@@ -511,7 +519,7 @@ for card in kpis_setup:
         gap_val = ((c_vals["actual"] - c_vals["plan"]) / c_vals["plan"]) * 100
         gap_pct_str = f"{gap_val:+.1f}%".replace(".", ",")
         
-        ach_pct = c_vals["proj"] / c_vals["plan"] if "YTD" in viz_mode or "MTD" in viz_mode else c_vals["actual"] / c_vals["plan"]
+        ach_pct = c_vals["proj"] / c_vals["plan"] if "YTD" in viz_mode or "MTD" in viz_mode or not has_weeks_data else c_vals["actual"] / c_vals["plan"]
         if ach_pct >= 0.95:
             card_farol = "🟢"
             card_color = "#166534"
@@ -548,116 +556,134 @@ for card in kpis_setup:
 
 st.markdown('<br>', unsafe_allow_html=True)
 
+# Inform discretely if month has only consolidated monthly data
+if not has_weeks_data:
+    st.info("Este mês possui apenas dados consolidados mensais.")
+
 # 2x2 Quadrants Layout
 row1_col1, row1_col2 = st.columns(2)
 row2_col1, row2_col2 = st.columns(2)
 
 quadrants_setup = [
-    {
-        "slot": row1_col1,
-        "title": "GMV COMERCIAL",
-        "key": "GMV",
-        "fmt": fmt_currency,
-        "is_ticket": False
-    },
-    {
-        "slot": row1_col2,
-        "title": "FATURAMENTO (RECEITA)",
-        "key": "Receita Hanzo",
-        "fmt": fmt_currency,
-        "is_ticket": False
-    },
-    {
-        "slot": row2_col1,
-        "title": "PEDIDOS ENTREGUES",
-        "key": "Pedidos",
-        "fmt": fmt_qty,
-        "is_ticket": False
-    },
-    {
-        "slot": row2_col2,
-        "title": "TICKET MÉDIO",
-        "key": "Ticket Médio",
-        "fmt": fmt_currency,
-        "is_ticket": True
-    }
+    {"slot": row1_col1, "title": "GMV COMERCIAL", "key": "GMV", "fmt": fmt_currency, "is_ticket": False},
+    {"slot": row1_col2, "title": "FATURAMENTO (RECEITA)", "key": "Receita Hanzo", "fmt": fmt_currency, "is_ticket": False},
+    {"slot": row2_col1, "title": "PEDIDOS ENTREGUES", "key": "Pedidos", "fmt": fmt_qty, "is_ticket": False},
+    {"slot": row2_col2, "title": "TICKET MÉDIO", "key": "Ticket Médio", "fmt": fmt_currency, "is_ticket": True}
 ]
+
+# Map month-end column count for selected month in Projeção sheet
+total_weeks_sel = len(m_map_proj[month_sel_en]["weekly"]) if month_sel_en in m_map_proj else 0
 
 for quad in quadrants_setup:
     q_key = quad["key"]
     
-    # 1. EXTRACT DATA LIST PER CLIENT FOR RANKINGS (based on Mode)
+    # 1. EXTRACT CLIENT RANKINGS DATA
     client_data_list = []
-    for client in filtered_clients:
-        if "YTD" in viz_mode:
-            curr_val = sum(data_loader.clean_val(monthly_data[client][q_key]["real"][m]) for m in months_up_to)
-            accum_val = sum(data_loader.clean_val(monthly_data[client][q_key]["plan"][m]) for m in months_up_to)
-            orders_count = sum(data_loader.clean_val(monthly_data[client]["Pedidos"]["real"][m]) for m in months_up_to)
-            
-            if quad["is_ticket"]:
-                acc_gmv = sum(data_loader.clean_val(monthly_data[client]["GMV"]["real"][m]) for m in months_up_to)
-                curr_val = acc_gmv / orders_count if orders_count > 0 else 0.0
-                
-                acc_gmv_plan = sum(data_loader.clean_val(monthly_data[client]["GMV"]["plan"][m]) for m in months_up_to)
-                acc_ped_plan = sum(data_loader.clean_val(monthly_data[client]["Pedidos"]["plan"][m]) for m in months_up_to)
-                accum_val = acc_gmv_plan / acc_ped_plan if acc_ped_plan > 0 else 0.0
+    has_client_level_data = True
+    
+    # Check if client-level actual data exists in selected mode / sheets
+    if "YTD" in viz_mode:
+        # Validate that client-level YTD actual data exists in Planejamento
+        total_ytd_real = sum(data_loader.clean_val(monthly_data[c][q_key]["real"][m]) for c in filtered_clients for m in months_up_to)
+        if total_ytd_real == 0:
+            has_client_level_data = False
         else:
-            weekly_cols_active = m_map_proj[month_sel_en]["weekly"]
-            weights_row = df_proj.iloc[3]
-            weekly_weights = [data_loader.clean_val(weights_row[col]) for col in weekly_cols_active]
-            sum_weights = sum(weekly_weights)
-            if sum_weights == 0:
-                weekly_weights = [1.0 / len(weekly_cols_active)] * len(weekly_cols_active)
-            else:
-                weekly_weights = [w / sum_weights for w in weekly_weights]
-                
-            target_m = data_loader.clean_val(weekly_data[client][q_key]["plan"][month_sel_en])
-            prorated_target = target_m * sum(weekly_weights[:selected_week_idx + 1])
-            
-            if "Week" in viz_mode:
-                curr_val = data_loader.clean_val(weekly_data[client][q_key]["weekly"][month_sel_en][selected_week_idx])
-                accum_val = sum(data_loader.clean_val(weekly_data[client][q_key]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
-                orders_count = data_loader.clean_val(weekly_data[client]["Pedidos"]["weekly"][month_sel_en][selected_week_idx])
+            for client in filtered_clients:
+                curr_val = sum(data_loader.clean_val(monthly_data[client][q_key]["real"][m]) for m in months_up_to)
+                accum_val = sum(data_loader.clean_val(monthly_data[client][q_key]["plan"][m]) for m in months_up_to)
+                orders_count = sum(data_loader.clean_val(monthly_data[client]["Pedidos"]["real"][m]) for m in months_up_to)
                 
                 if quad["is_ticket"]:
-                    wk_gmv = data_loader.clean_val(weekly_data[client]["GMV"]["weekly"][month_sel_en][selected_week_idx])
-                    if orders_count == 0:
-                        continue
-                    curr_val = wk_gmv / orders_count
+                    acc_gmv = sum(data_loader.clean_val(monthly_data[client]["GMV"]["real"][m]) for m in months_up_to)
+                    curr_val = acc_gmv / orders_count if orders_count > 0 else 0.0
                     
-                    acc_gmv_wk = sum(data_loader.clean_val(weekly_data[client]["GMV"]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
-                    acc_ped_wk = sum(data_loader.clean_val(weekly_data[client]["Pedidos"]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
-                    accum_val = acc_gmv_wk / acc_ped_wk if acc_ped_wk > 0 else 0.0
+                    acc_gmv_plan = sum(data_loader.clean_val(monthly_data[client]["GMV"]["plan"][m]) for m in months_up_to)
+                    acc_ped_plan = sum(data_loader.clean_val(monthly_data[client]["Pedidos"]["plan"][m]) for m in months_up_to)
+                    accum_val = acc_gmv_plan / acc_ped_plan if acc_ped_plan > 0 else 0.0
+                    
+                client_data_list.append({
+                    "client": client, "curr": curr_val, "accum": accum_val, "orders": orders_count
+                })
+    else:
+        # Selected Month (consolidated Jan-May or weekly Jun-Dec)
+        if not has_weeks_data:
+            # Pre-June months Consolidado Mode: Validate client-level monthly actual data in Planejamento
+            total_real_month = sum(data_loader.clean_val(monthly_data[c][q_key]["real"][month_sel_en]) for c in filtered_clients)
+            if total_real_month == 0:
+                has_client_level_data = False
             else:
-                curr_val = sum(data_loader.clean_val(weekly_data[client][q_key]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
-                accum_val = sum(data_loader.clean_val(monthly_data[client][q_key]["real"][m]) for m in months_up_to)
-                
-                orders_count = sum(data_loader.clean_val(weekly_data[client]["Pedidos"]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
-                
-                if quad["is_ticket"]:
-                    acc_gmv_wk = sum(data_loader.clean_val(weekly_data[client]["GMV"]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
-                    if orders_count == 0:
-                        continue
-                    curr_val = acc_gmv_wk / orders_count
+                for client in filtered_clients:
+                    curr_val = data_loader.clean_val(monthly_data[client][q_key]["real"][month_sel_en])
+                    accum_val = data_loader.clean_val(monthly_data[client][q_key]["plan"][month_sel_en])
+                    orders_count = data_loader.clean_val(monthly_data[client]["Pedidos"]["real"][month_sel_en])
                     
-                    ytd_gmv = sum(data_loader.clean_val(monthly_data[client]["GMV"]["real"][m]) for m in months_up_to)
-                    ytd_ped = sum(data_loader.clean_val(monthly_data[client]["Pedidos"]["real"][m]) for m in months_up_to)
-                    accum_val = ytd_gmv / ytd_ped if ytd_ped > 0 else 0.0
+                    if quad["is_ticket"]:
+                        acc_gmv = data_loader.clean_val(monthly_data[client]["GMV"]["real"][month_sel_en])
+                        curr_val = acc_gmv / orders_count if orders_count > 0 else 0.0
+                        
+                        acc_gmv_plan = data_loader.clean_val(monthly_data[client]["GMV"]["plan"][month_sel_en])
+                        acc_ped_plan = data_loader.clean_val(monthly_data[client]["Pedidos"]["plan"][month_sel_en])
+                        accum_val = acc_gmv_plan / acc_ped_plan if acc_ped_plan > 0 else 0.0
+                        
+                    client_data_list.append({
+                        "client": client, "curr": curr_val, "accum": accum_val, "orders": orders_count
+                    })
+        else:
+            # June onwards: Load from Projeção weekly columns
+            for client in filtered_clients:
+                target_m = data_loader.clean_val(weekly_data[client][q_key]["plan"][month_sel_en])
+                
+                # Check dynamic weights
+                weights_row = df_proj.iloc[3]
+                weekly_weights = [data_loader.clean_val(weights_row[col]) for col in weekly_cols]
+                sum_weights = sum(weekly_weights)
+                if sum_weights == 0:
+                    weekly_weights = [1.0 / len(weekly_cols)] * len(weekly_cols)
+                else:
+                    weekly_weights = [w / sum_weights for w in weekly_weights]
                     
-        client_data_list.append({
-            "client": client,
-            "curr": curr_val,
-            "accum": accum_val,
-            "orders": orders_count
-        })
+                if "Week" in viz_mode:
+                    curr_val = data_loader.clean_val(weekly_data[client][q_key]["weekly"][month_sel_en][selected_week_idx])
+                    accum_val = sum(data_loader.clean_val(weekly_data[client][q_key]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
+                    orders_count = data_loader.clean_val(weekly_data[client]["Pedidos"]["weekly"][month_sel_en][selected_week_idx])
+                    
+                    if quad["is_ticket"]:
+                        wk_gmv = data_loader.clean_val(weekly_data[client]["GMV"]["weekly"][month_sel_en][selected_week_idx])
+                        if orders_count == 0:
+                            continue
+                        curr_val = wk_gmv / orders_count
+                        
+                        acc_gmv_wk = sum(data_loader.clean_val(weekly_data[client]["GMV"]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
+                        acc_ped_wk = sum(data_loader.clean_val(weekly_data[client]["Pedidos"]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
+                        accum_val = acc_gmv_wk / acc_ped_wk if acc_ped_wk > 0 else 0.0
+                else:
+                    curr_val = sum(data_loader.clean_val(weekly_data[client][q_key]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
+                    accum_val = sum(data_loader.clean_val(monthly_data[client][q_key]["real"][m]) for m in months_up_to)
+                    orders_count = sum(data_loader.clean_val(weekly_data[client]["Pedidos"]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
+                    
+                    if quad["is_ticket"]:
+                        acc_gmv_wk = sum(data_loader.clean_val(weekly_data[client]["GMV"]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
+                        if orders_count == 0:
+                            continue
+                        curr_val = acc_gmv_wk / orders_count
+                        
+                        ytd_gmv = sum(data_loader.clean_val(monthly_data[client]["GMV"]["real"][m]) for m in months_up_to)
+                        ytd_ped = sum(data_loader.clean_val(monthly_data[client]["Pedidos"]["real"][m]) for m in months_up_to)
+                        accum_val = ytd_gmv / ytd_ped if ytd_ped > 0 else 0.0
+                        
+                client_data_list.append({
+                    "client": client, "curr": curr_val, "accum": accum_val, "orders": orders_count
+                })
 
+    # Sort Rankings strictly by absolute value
     group_curr_total = sum(c["curr"] for c in client_data_list)
-
     sorted_top = sorted(client_data_list, key=lambda x: (-x["curr"], x["client"]))
     
+    # Bottom 5 positive-only activity filter
     filtered_bottom = [r for r in client_data_list if r["curr"] > 0 and r["accum"] > 0 and r["client"].strip() != ""]
     sorted_bottom = sorted(filtered_bottom, key=lambda x: (x["curr"], x["client"]))
 
+    # 2. CHALLENGE CARD METRICS PREPARATION (Projeção)
     if "YTD" in viz_mode:
         if quad["is_ticket"]:
             g_tgt = sum(data_loader.clean_val(monthly_data[c]["GMV"]["plan"][m]) for c in filtered_clients for m in EN_MONTHS)
@@ -678,7 +704,7 @@ for quad in quadrants_setup:
     diff_challenge = None
     is_latest_wk = (selected_week_idx == len(weekly_cols) - 1)
     
-    if is_latest_wk and "YTD" not in viz_mode:
+    if is_latest_wk and "YTD" not in viz_mode and has_weeks_data:
         diff_list = [weekly_data[c][q_key]["diff"][month_sel_en] for c in filtered_clients]
         diff_numeric = [clean_val(x) for x in diff_list if x is not None and not pd.isna(x)]
         if len(diff_numeric) == len(filtered_clients):
@@ -687,12 +713,13 @@ for quad in quadrants_setup:
     if diff_challenge is None:
         diff_challenge = target_val - accum_challenge
 
+    # Dynamic weeks left count
     if "YTD" in viz_mode:
         remaining_months_count = 11 - EN_MONTHS.index(month_sel_en)
-        weeks_left_curr = len(weekly_cols) - (selected_week_idx + 1)
+        weeks_left_curr = len(weekly_cols) - (selected_week_idx + 1) if has_weeks_data else 0
         rem_weeks = weeks_left_curr + (4 * remaining_months_count)
     else:
-        rem_weeks = len(weekly_cols) - (selected_week_idx + 1)
+        rem_weeks = len(weekly_cols) - (selected_week_idx + 1) if has_weeks_data else 0
 
     if target_val == 0:
         challenge_msg = "Meta não definida"
@@ -721,174 +748,139 @@ for quad in quadrants_setup:
             challenge_color = "#991B1B"
             badge_theme = "status-red"
 
+    # Render inside Slot Card
     with quad["slot"]:
         st.markdown(f'<div class="quadrant-container">', unsafe_allow_html=True)
         st.markdown(f'<div class="quadrant-title">{quad["title"]}</div>', unsafe_allow_html=True)
         
-        # TOP 5 CLIENTS TABLE
-        st.markdown(f'<div class="table-section-title">Top 5 Clients</div>', unsafe_allow_html=True)
-        st.markdown(f'''
-        <table class="compact-table" style="font-size: 13px !important;">
-            <thead>
-                <tr>
-                    <th style="width:10%;">Rank</th>
-                    <th style="width:40%;">Cliente</th>
-                    <th style="width:20%;">Valor Atual</th>
-                    <th style="width:15%;">{"Pedidos" if quad["is_ticket"] else "Share %"}</th>
-                    <th style="width:15%;">Valor Acumulado</th>
-                </tr>
-            </thead>
-            <tbody>
-        ''', unsafe_allow_html=True)
+        # 1. TOP 5 CLIENTS TABLE
+        tbl_top_title = "Top 5 Clientes do Mês" if not has_weeks_data else "Top 5 Clients"
+        st.markdown(f'<div class="table-section-title">{tbl_top_title}</div>', unsafe_allow_html=True)
         
-        for idx, row in enumerate(sorted_top[:5]):
-            share_str = f"{row['orders']:.0f}" if quad["is_ticket"] else (f"{(row['curr']/group_curr_total)*100:.1f}%" if group_curr_total > 0 else "0.0%")
+        if not has_client_level_data:
+            msg_unavail = "Ranking YTD por cliente indisponível para este período." if "YTD" in viz_mode else "Ranking por cliente indisponível para este mês."
+            st.markdown(f'<div style="text-align:center; color:#64748B; font-size:13px; margin: 1rem 0;">{msg_unavail}</div>', unsafe_allow_html=True)
+        else:
             st.markdown(f'''
-                <tr>
-                    <td><b>{idx+1}</b></td>
-                    <td>{row["client"]}</td>
-                    <td>{quad["fmt"](row["curr"])}</td>
-                    <td>{share_str}</td>
-                    <td>{quad["fmt"](row["accum"])}</td>
-                </tr>
+            <div class="table-container">
+                <table class="compact-table">
+                    <thead>
+                        <tr>
+                            <th class="col-rank">Rank</th>
+                            <th class="col-client">Cliente</th>
+                            <th class="col-curr">Valor Atual</th>
+                            <th class="col-share">{"Pedidos" if quad["is_ticket"] else "Share %"}</th>
+                            <th class="col-accum">{"Ticket Acumulado" if quad["is_ticket"] else "Valor Acumulado"}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
             ''', unsafe_allow_html=True)
             
-        st.markdown('</tbody></table>', unsafe_allow_html=True)
+            for idx, row in enumerate(sorted_top[:5]):
+                share_str = f"{row['orders']:.0f}" if quad["is_ticket"] else (f"{(row['curr']/group_curr_total)*100:.1f}%" if group_curr_total > 0 else "0.0%")
+                st.markdown(f'''
+                        <tr>
+                            <td class="col-rank"><b>{idx+1}</b></td>
+                            <td class="col-client">{row["client"]}</td>
+                            <td class="col-curr">{quad["fmt"](row["curr"])}</td>
+                            <td class="col-share">{share_str}</td>
+                            <td class="col-accum">{quad["fmt"](row["accum"])}</td>
+                        </tr>
+                ''', unsafe_allow_html=True)
+            st.markdown('</tbody></table></div>', unsafe_allow_html=True)
+            
         st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
         
-        # BOTTOM 5 CLIENTS WITH ACTIVITY TABLE
-        st.markdown(f'<div class="table-section-title">Bottom 5 Clients with Activity</div>', unsafe_allow_html=True)
-        st.markdown(f'''
-        <table class="compact-table" style="font-size: 13px !important;">
-            <thead>
-                <tr>
-                    <th style="width:10%;">Rank</th>
-                    <th style="width:40%;">Cliente</th>
-                    <th style="width:20%;">Valor Atual</th>
-                    <th style="width:15%;">{"Pedidos" if quad["is_ticket"] else "Share %"}</th>
-                    <th style="width:15%;">Valor Acumulado</th>
-                </tr>
-            </thead>
-            <tbody>
-        ''', unsafe_allow_html=True)
+        # 2. BOTTOM 5 CLIENTS TABLE
+        tbl_bot_title = "Bottom 5 Clientes com Movimentação no Mês" if not has_weeks_data else "Bottom 5 Clients with Activity"
+        st.markdown(f'<div class="table-section-title">{tbl_bot_title}</div>', unsafe_allow_html=True)
         
-        for idx, row in enumerate(sorted_bottom[:5]):
-            share_str = f"{row['orders']:.0f}" if quad["is_ticket"] else (f"{(row['curr']/group_curr_total)*100:.1f}%" if group_curr_total > 0 else "0.0%")
+        if not has_client_level_data:
+            msg_unavail = "Ranking YTD por cliente indisponível para este período." if "YTD" in viz_mode else "Ranking por cliente indisponível para este mês."
+            st.markdown(f'<div style="text-align:center; color:#64748B; font-size:13px; margin: 1rem 0;">{msg_unavail}</div>', unsafe_allow_html=True)
+        else:
             st.markdown(f'''
-                <tr>
-                    <td><b>{idx+1}</b></td>
-                    <td>{row["client"]}</td>
-                    <td>{quad["fmt"](row["curr"])}</td>
-                    <td>{share_str}</td>
-                    <td>{quad["fmt"](row["accum"])}</td>
-                </tr>
+            <div class="table-container">
+                <table class="compact-table">
+                    <thead>
+                        <tr>
+                            <th class="col-rank">Rank</th>
+                            <th class="col-client">Cliente</th>
+                            <th class="col-curr">Valor Atual</th>
+                            <th class="col-share">{"Pedidos" if quad["is_ticket"] else "Share %"}</th>
+                            <th class="col-accum">{"Ticket Acumulado" if quad["is_ticket"] else "Valor Acumulado"}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
             ''', unsafe_allow_html=True)
             
-        if not sorted_bottom:
-            st.markdown('<tr><td colspan="5" style="text-align:center; color:#64748B;">Nenhum cliente ativo no período.</td></tr>', unsafe_allow_html=True)
+            for idx, row in enumerate(sorted_bottom[:5]):
+                share_str = f"{row['orders']:.0f}" if quad["is_ticket"] else (f"{(row['curr']/group_curr_total)*100:.1f}%" if group_curr_total > 0 else "0.0%")
+                st.markdown(f'''
+                        <tr>
+                            <td class="col-rank"><b>{idx+1}</b></td>
+                            <td class="col-client">{row["client"]}</td>
+                            <td class="col-curr">{quad["fmt"](row["curr"])}</td>
+                            <td class="col-share">{share_str}</td>
+                            <td class="col-accum">{quad["fmt"](row["accum"])}</td>
+                        </tr>
+                ''', unsafe_allow_html=True)
+                
+            if not sorted_bottom:
+                st.markdown('<tr><td colspan="5" style="text-align:center; color:#64748B; padding: 1rem 0;">Nenhum cliente ativo no período.</td></tr>', unsafe_allow_html=True)
+            st.markdown('</tbody></table></div>', unsafe_allow_html=True)
             
-        st.markdown('</tbody></table>', unsafe_allow_html=True)
         st.markdown('<div style="height:20px;"></div>', unsafe_allow_html=True)
         
-        # EVOLUTION CHART
+        # 3. EVOLUTION CHART (January to December MoM - from Planejamento)
         st.markdown(f'<div class="table-section-title">Evolução Histórica</div>', unsafe_allow_html=True)
         
         fig = go.Figure()
         
-        if "YTD" in viz_mode:
-            plan_MoM = []
-            real_MoM = []
-            
-            for m in EN_MONTHS:
-                if m in m_map_proj:
-                    cl_plan = sum(data_loader.clean_val(monthly_data[c][q_key]["plan"][m]) for c in filtered_clients)
-                    cl_real = sum(data_loader.clean_val(monthly_data[c][q_key]["real"][m]) for c in filtered_clients)
-                    
-                    if quad["is_ticket"]:
-                        g_plan = sum(data_loader.clean_val(monthly_data[c]["GMV"]["plan"][m]) for c in filtered_clients)
-                        p_plan = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["plan"][m]) for c in filtered_clients)
-                        cl_plan = g_plan / p_plan if p_plan > 0 else 0.0
-                        
-                        g_real = sum(data_loader.clean_val(monthly_data[c]["GMV"]["real"][m]) for c in filtered_clients)
-                        p_real = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["real"][m]) for c in filtered_clients)
-                        cl_real = g_real / p_real if p_real > 0 else 0.0
-                else:
-                    cl_plan = 0.0
-                    cl_real = 0.0
-                    
-                plan_MoM.append(cl_plan)
-                if cl_real > 0 or m == month_sel_en:
-                    real_MoM.append(cl_real)
-                else:
-                    real_MoM.append(None)
-                    
-            fig.add_trace(go.Scatter(
-                x=PT_MONTHS, y=plan_MoM, name="Planejado", line=dict(color="#002060", width=2.5)
-            ))
-            fig.add_trace(go.Scatter(
-                x=PT_MONTHS, y=real_MoM, name="Realizado", line=dict(color="#166534", width=2.5), connectgaps=False
-            ))
-            
-            sel_idx = EN_MONTHS.index(month_sel_en)
-            sel_val = real_MoM[sel_idx] if real_MoM[sel_idx] is not None else plan_MoM[sel_idx]
-            fig.add_trace(go.Scatter(
-                x=[PT_MONTHS[sel_idx]], y=[sel_val], name="Mês Selecionado",
-                marker=dict(color="#D97706", size=10, line=dict(color="#FFFFFF", width=2))
-            ))
-        else:
-            plan_W = []
-            real_W = []
-            
-            month_plan_tot = sum(data_loader.clean_val(weekly_data[c][q_key]["plan"][month_sel_en]) for c in filtered_clients)
-            
-            for w in range(num_weeks):
-                w_plan = month_plan_tot * weekly_weights[w]
-                w_real = 0.0
+        # Pull MoM values Jan to Dec using ONLY Planejamento sheet
+        plan_MoM = []
+        real_MoM = []
+        
+        for m in EN_MONTHS:
+            if m in m_map_proj:
+                cl_plan = sum(data_loader.clean_val(monthly_data[c][q_key]["plan"][m]) for c in filtered_clients)
+                cl_real = sum(data_loader.clean_val(monthly_data[c][q_key]["real"][m]) for c in filtered_clients)
                 
-                for c in filtered_clients:
-                    if quad["is_ticket"]:
-                        w_gmv = data_loader.clean_val(weekly_data[c]["GMV"]["weekly"][month_sel_en][w])
-                        w_ped = data_loader.clean_val(weekly_data[c]["Pedidos"]["weekly"][month_sel_en][w])
-                        w_real += w_gmv / w_ped if w_ped > 0 else 0.0
-                    else:
-                        w_real += data_loader.clean_val(weekly_data[c][q_key]["weekly"][month_sel_en][w])
-                        
-                plan_W.append(w_plan)
-                if w <= selected_week_idx:
-                    if "MTD" in viz_mode:
-                        if quad["is_ticket"]:
-                            cum_gmv = sum(data_loader.clean_val(weekly_data[c]["GMV"]["weekly"][month_sel_en][i]) for c in filtered_clients for i in range(w+1))
-                            cum_ped = sum(data_loader.clean_val(weekly_data[c]["Pedidos"]["weekly"][month_sel_en][i]) for c in filtered_clients for i in range(w+1))
-                            cum_real = cum_gmv / cum_ped if cum_ped > 0 else 0.0
-                        else:
-                            cum_real = sum(data_loader.clean_val(weekly_data[c][q_key]["weekly"][month_sel_en][i]) for c in filtered_clients for i in range(w+1))
-                        real_W.append(cum_real)
-                    else:
-                        real_W.append(w_real)
-                else:
-                    real_W.append(None)
+                if quad["is_ticket"]:
+                    g_plan = sum(data_loader.clean_val(monthly_data[c]["GMV"]["plan"][m]) for c in filtered_clients)
+                    p_plan = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["plan"][m]) for c in filtered_clients)
+                    cl_plan = g_plan / p_plan if p_plan > 0 else 0.0
                     
-            if "MTD" in viz_mode:
-                plan_cum = []
-                acc = 0.0
-                for val in plan_W:
-                    acc += val
-                    plan_cum.append(acc)
-                plan_W = plan_cum
+                    g_real = sum(data_loader.clean_val(monthly_data[c]["GMV"]["real"][m]) for c in filtered_clients)
+                    p_real = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["real"][m]) for c in filtered_clients)
+                    cl_real = g_real / p_real if p_real > 0 else 0.0
+            else:
+                cl_plan = 0.0
+                cl_real = 0.0
                 
-            fig.add_trace(go.Scatter(
-                x=week_options, y=plan_W, name="Planejado", line=dict(color="#002060", width=2.5)
-            ))
-            fig.add_trace(go.Scatter(
-                x=week_options, y=real_W, name="Realizado", line=dict(color="#166534", width=2.5), connectgaps=False
-            ))
-            
-            sel_val = real_W[selected_week_idx] if real_W[selected_week_idx] is not None else plan_W[selected_week_idx]
-            fig.add_trace(go.Scatter(
-                x=[week_options[selected_week_idx]], y=[sel_val], name="Semana Selecionada",
-                marker=dict(color="#D97706", size=10, line=dict(color="#FFFFFF", width=2))
-            ))
-            
+            plan_MoM.append(cl_plan)
+            # Only append real value if month is completed or selected month containing data
+            if cl_real > 0 or m == month_sel_en:
+                real_MoM.append(cl_real)
+            else:
+                real_MoM.append(None)
+                
+        fig.add_trace(go.Scatter(
+            x=PT_MONTHS, y=plan_MoM, name="Planejado", line=dict(color="#002060", width=2.5)
+        ))
+        fig.add_trace(go.Scatter(
+            x=PT_MONTHS, y=real_MoM, name="Realizado", line=dict(color="#166534", width=2.5), connectgaps=False
+        ))
+        
+        # Highlight selected month visually with marker (without duplicate legend item)
+        sel_idx = EN_MONTHS.index(month_sel_en)
+        sel_val = real_MoM[sel_idx] if real_MoM[sel_idx] is not None else plan_MoM[sel_idx]
+        fig.add_trace(go.Scatter(
+            x=[PT_MONTHS[sel_idx]], y=[sel_val],
+            marker=dict(color="#D97706", size=10, line=dict(color="#FFFFFF", width=2)),
+            showlegend=False # Prevents duplicate item in legend
+        ))
+        
         fig.update_layout(
             height=320,
             margin=dict(l=10, r=10, t=10, b=10),
@@ -903,7 +895,7 @@ for quad in quadrants_setup:
         st.plotly_chart(fig, use_container_width=True)
         st.markdown('<div style="height:15px;"></div>', unsafe_allow_html=True)
         
-        # CHALLENGE TO TARGET CARD
+        # 4. CHALLENGE TO TARGET CARD
         st.markdown(f'''
         <div class="kpi-card" style="border: 1px solid #E2E8F0; padding:1rem; background-color:#FFFFFF;">
             <div style="font-size:0.8rem; font-weight:700; color:#64748B; letter-spacing:0.5px; text-transform:uppercase;">
