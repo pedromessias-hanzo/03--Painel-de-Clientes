@@ -16,36 +16,41 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Load CSS Stylesheet for custom styling
+# Load CSS Stylesheet for professional BI dashboard look
 st.markdown("""
 <style>
-    /* Executive Cockpit Styling */
+    /* Premium Board Dashboard Styling */
     html, body, [data-testid="stAppViewContainer"] {
         background-color: #FFFFFF;
         color: #0F172A;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     
-    /* Header and Title Styles */
+    /* Executive Header */
     .cockpit-header {
-        border-bottom: 2px solid #E2E8F0;
+        border-bottom: 3px solid #002060;
         padding-bottom: 0.5rem;
         margin-bottom: 1rem;
     }
     .cockpit-title {
         color: #002060;
-        font-size: 2.2rem;
+        font-size: 2.4rem;
         font-weight: 800;
         margin: 0;
         letter-spacing: -0.5px;
     }
     .cockpit-subtitle {
         color: #64748B;
-        font-size: 0.95rem;
+        font-size: 1rem;
         margin-top: 0.2rem;
     }
     
-    /* Large Month Status Badge */
+    /* Top Filters Bar styling */
+    div[data-testid="stHorizontalBlock"] {
+        margin-bottom: 0.5rem;
+    }
+    
+    /* Large Status Badges */
     .status-badge-container {
         display: flex;
         flex-direction: column;
@@ -54,14 +59,13 @@ st.markdown("""
         height: 100%;
     }
     .status-badge {
-        padding: 0.75rem 1.5rem;
-        border-radius: 8px;
+        padding: 0.65rem 1.25rem;
+        border-radius: 6px;
         font-weight: 700;
-        font-size: 1.1rem;
+        font-size: 1rem;
         text-align: center;
         border: 1px solid transparent;
         display: inline-block;
-        margin-bottom: 0.5rem;
     }
     .status-green {
         background-color: #F0FDF4;
@@ -78,73 +82,112 @@ st.markdown("""
         color: #991B1B;
         border-color: #FCA5A5;
     }
+    .status-neutral {
+        background-color: #F1F5F9;
+        color: #475569;
+        border-color: #CBD5E1;
+    }
     
-    /* Card Styles */
-    .cockpit-card {
-        background-color: #FFFFFF;
+    /* KPI Metric Cards */
+    .kpi-card {
+        background-color: #F8FAFC;
         border: 1px solid #E2E8F0;
         border-radius: 8px;
-        padding: 1rem;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        padding: 1.25rem;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
     }
-    .card-title {
-        color: #002060;
-        font-size: 1.1rem;
+    .kpi-card-title {
+        color: #64748B;
+        font-size: 0.9rem;
         font-weight: 700;
-        margin-bottom: 0.75rem;
-        border-bottom: 1px solid #F1F5F9;
-        padding-bottom: 0.25rem;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        margin-bottom: 0.5rem;
     }
-    
-    /* KPI Indicators formatting */
     .kpi-main-val {
-        font-size: 1.8rem;
+        font-size: 2.1rem;
         font-weight: 800;
         color: #002060;
         line-height: 1.1;
     }
+    .kpi-sub-row {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 0.75rem;
+        border-top: 1px solid #E2E8F0;
+        padding-top: 0.5rem;
+    }
     .kpi-sub-label {
-        font-size: 0.8rem;
+        font-size: 0.75rem;
         color: #64748B;
         font-weight: 600;
-        margin-top: 0.4rem;
     }
     .kpi-sub-val {
-        font-size: 0.95rem;
+        font-size: 0.85rem;
         font-weight: 700;
         color: #0F172A;
     }
     .kpi-light {
-        font-size: 1rem;
+        font-size: 0.95rem;
         display: inline-block;
         vertical-align: middle;
         margin-left: 0.25rem;
     }
     
-    /* Tight Table formatting */
+    /* Quadrant Container card */
+    .quadrant-container {
+        background-color: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+        margin-bottom: 1.5rem;
+    }
+    .quadrant-title {
+        color: #002060;
+        font-size: 1.3rem;
+        font-weight: 800;
+        border-bottom: 2px solid #E2E8F0;
+        padding-bottom: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    /* Table styling with font size 13px */
     .compact-table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 0.82rem;
+        font-size: 13px !important;
+        margin-bottom: 1rem;
     }
     .compact-table th {
         background-color: #F8FAFC;
         color: #475569;
         font-weight: 700;
         text-align: left;
-        padding: 0.35rem 0.5rem;
-        border-bottom: 1px solid #E2E8F0;
+        padding: 0.5rem;
+        border-bottom: 2px solid #CBD5E1;
     }
     .compact-table td {
-        padding: 0.35rem 0.5rem;
-        border-bottom: 1px solid #F1F5F9;
+        padding: 0.5rem;
+        border-bottom: 1px solid #E2E8F0;
         color: #0F172A;
     }
     .compact-table tr:hover {
-        background-color: #F8FAFC;
+        background-color: #F1F5F9;
     }
     
-    /* Hide Streamlit components */
+    /* Table headers text color */
+    .table-section-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #475569;
+        margin-top: 0.75rem;
+        margin-bottom: 0.4rem;
+        border-left: 3px solid #64748B;
+        padding-left: 0.5rem;
+    }
+    
+    /* Hide default streamlit items */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
@@ -160,19 +203,15 @@ GOOGLE_DRIVE_FILE_ID = "paste_file_id_here"
 @st.cache_data(ttl=300)
 def load_and_cache_data():
     try:
-        # Check if Google Drive file ID is set
         if GOOGLE_DRIVE_FILE_ID and GOOGLE_DRIVE_FILE_ID != "paste_file_id_here" and GOOGLE_DRIVE_FILE_ID.strip() != "":
             file_id = GOOGLE_DRIVE_FILE_ID.strip()
-            # Direct download URL for binary files uploaded to Google Drive
             url = f"https://drive.google.com/uc?export=download&id={file_id}"
             headers = {"User-Agent": "Mozilla/5.0"}
             response = requests.get(url, headers=headers, timeout=30)
             response.raise_for_status()
-            
             content = response.content
-            # Check if Google Drive demands login/auth page (returned as HTML instead of binary xlsx)
+            
             if b"google.com" in content[:100] and b"html" in content[:100].lower():
-                # Try export sheet format in case it is a converted Google Sheets file
                 url_export = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
                 response = requests.get(url_export, headers=headers, timeout=30)
                 response.raise_for_status()
@@ -181,7 +220,6 @@ def load_and_cache_data():
             data_bytes = io.BytesIO(content)
             xl = pd.ExcelFile(data_bytes)
             
-            # Retrieve last modified time from response header, fallback to current time
             last_modified = datetime.datetime.now()
             if "Last-Modified" in response.headers:
                 try:
@@ -189,7 +227,6 @@ def load_and_cache_data():
                 except:
                     pass
         else:
-            # Fallback to local spreadsheet path
             excel_path = os.path.join(os.path.dirname(__file__), "Planejamento 2026.xlsx")
             if not os.path.exists(excel_path):
                 raise FileNotFoundError(
@@ -199,7 +236,6 @@ def load_and_cache_data():
             mtime = os.path.getmtime(excel_path)
             last_modified = datetime.datetime.fromtimestamp(mtime)
             
-        # Parse all sheets into dict of dataframes to ensure return values are fully serializable for cache_data
         sheets_data = {}
         for s in xl.sheet_names:
             if s in ["Planejamento", "Projeção", "Projeo"]:
@@ -224,10 +260,10 @@ EN_MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out
 PT_MONTH_DISPLAY = dict(zip(EN_MONTHS, PT_MONTHS))
 PT_TO_EN = {v: k for k, v in PT_MONTH_DISPLAY.items()}
 
-# Parse separated data using data_loader
+# Parse Data
 overview_data, monthly_data, weekly_data, clients_metadata = data_loader.load_data(sheets_data)
 
-# Retrieve active weekly sheet for columns mapping
+# Retrieve active sheet to map weeks dynamically
 proj_sheet = None
 for s in ["Projeção", "Projeo"]:
     if s in sheets_data:
@@ -241,7 +277,7 @@ else:
     df_proj = sheets_data.get("Planejamento")
     m_map_proj = data_loader.map_columns(df_proj)
 
-# Find available months (months containing weekly columns in Projeção sheet)
+# Find available months (months with weekly monitoring)
 available_months_en = [m for m in EN_MONTHS if m in m_map_proj and len(m_map_proj[m]["weekly"]) > 0]
 available_months_pt = [PT_MONTH_DISPLAY[m] for m in available_months_en]
 
@@ -249,7 +285,7 @@ if not available_months_en:
     st.error("Nenhum mês com monitoramento semanal encontrado na planilha.")
     st.stop()
 
-# Determine default month (latest containing weekly actuals > 0)
+# Default Month (latest with actuals > 0)
 default_month_en = available_months_en[-1]
 for m in reversed(available_months_en):
     has_data = False
@@ -264,11 +300,11 @@ for m in reversed(available_months_en):
 default_month_pt = PT_MONTH_DISPLAY[default_month_en]
 
 # 1. FILTERS ROW
-col_m_filt, col_w_filt, col_g_filt, col_ref = st.columns([1.5, 1.5, 2, 1])
+col_m_filt, col_w_filt, col_mode_filt, col_g_filt, col_ref = st.columns([1.5, 1.5, 1.8, 1.8, 1])
 
 with col_m_filt:
     month_sel_pt = st.selectbox(
-        "Mês de Monitoramento",
+        "Mês",
         available_months_pt,
         index=available_months_pt.index(default_month_pt)
     )
@@ -279,7 +315,7 @@ weekly_cols = m_map_proj[month_sel_en]["weekly"]
 num_weeks = len(weekly_cols)
 week_options = [f"Semana {i+1}" for i in range(num_weeks)]
 
-# Determine default week (latest containing weekly actuals > 0)
+# Determine default week (latest week in that month with actuals > 0)
 default_week_idx = 0
 for w_idx in reversed(range(num_weeks)):
     w_sum = sum(data_loader.clean_val(weekly_data[c]["GMV"]["weekly"][month_sel_en][w_idx]) for c in weekly_data)
@@ -289,11 +325,18 @@ for w_idx in reversed(range(num_weeks)):
 
 with col_w_filt:
     week_sel_label = st.selectbox(
-        "Semana de Análise",
+        "Semana",
         week_options,
         index=default_week_idx
     )
     selected_week_idx = week_options.index(week_sel_label)
+
+with col_mode_filt:
+    viz_mode = st.selectbox(
+        "Modo de Visualização",
+        ["📅 Selected Week", "📈 Month To Date (MTD)", "🏆 Year To Date (YTD)"],
+        index=1 # Default MTD
+    )
 
 with col_g_filt:
     group_filter = st.selectbox(
@@ -308,7 +351,7 @@ with col_ref:
         st.cache_data.clear()
         st.rerun()
 
-# Filter clients list
+# Filter clients list based on group selection
 filtered_clients = []
 for client in weekly_data:
     group = clients_metadata.get(client, {}).get("group", "Independente")
@@ -325,10 +368,103 @@ def fmt_qty(val):
 def clean_val(val):
     return data_loader.clean_val(val)
 
+# Months up to selected for YTD calculations
+months_up_to = EN_MONTHS[:EN_MONTHS.index(month_sel_en) + 1]
+
+# Global metrics aggregations helper
+def get_kpi_metrics(metric_key):
+    actual = 0.0
+    planned = 0.0
+    projection = 0.0
+    
+    # 1. ACTUAL & PLANNED VALUE (based on Mode)
+    if "YTD" in viz_mode:
+        for m in months_up_to:
+            for c in filtered_clients:
+                actual += data_loader.clean_val(monthly_data[c][metric_key]["real"][m])
+                planned += data_loader.clean_val(monthly_data[c][metric_key]["plan"][m])
+                
+        # Projection rhythm YTD = (YTD_Actual / elapsed_months) * 12
+        elapsed_m = 0
+        for m in months_up_to:
+            m_sum = sum(data_loader.clean_val(monthly_data[c]["GMV"]["real"][m]) for c in weekly_data)
+            if m_sum > 0:
+                elapsed_m += 1
+        K_m = max(1, elapsed_m)
+        projection = (actual / K_m) * 12
+    else:
+        m_plan_month = sum(data_loader.clean_val(monthly_data[c][metric_key]["plan"][month_sel_en]) for c in filtered_clients)
+        
+        weekly_cols_active = m_map_proj[month_sel_en]["weekly"]
+        weights_row = df_proj.iloc[3]
+        weekly_weights = [data_loader.clean_val(weights_row[col]) for col in weekly_cols_active]
+        sum_weights = sum(weekly_weights)
+        if sum_weights == 0:
+            weekly_weights = [1.0 / len(weekly_cols_active)] * len(weekly_cols_active)
+        else:
+            weekly_weights = [w / sum_weights for w in weekly_weights]
+            
+        elapsed_w = 0
+        for w in range(selected_week_idx + 1):
+            w_sum = sum(data_loader.clean_val(weekly_data[c]["GMV"]["weekly"][month_sel_en][w]) for c in weekly_data)
+            if w_sum > 0:
+                elapsed_w += 1
+        K_w = max(1, elapsed_w)
+        
+        if "Week" in viz_mode:
+            for c in filtered_clients:
+                actual += data_loader.clean_val(weekly_data[c][metric_key]["weekly"][month_sel_en][selected_week_idx])
+            planned = m_plan_month * weekly_weights[selected_week_idx]
+            projection = (actual / 1) * len(weekly_cols_active)
+        else:
+            for w in range(selected_week_idx + 1):
+                for c in filtered_clients:
+                    actual += data_loader.clean_val(weekly_data[c][metric_key]["weekly"][month_sel_en][w])
+            planned = m_plan_month * sum(weekly_weights[:selected_week_idx + 1])
+            projection = (actual / K_w) * len(weekly_cols_active)
+            
+    if metric_key == "Ticket Médio":
+        actual_gmv, planned_gmv, proj_gmv = get_kpi_metrics("GMV")
+        actual_ped, planned_ped, proj_ped = get_kpi_metrics("Pedidos")
+        
+        actual = actual_gmv / actual_ped if actual_ped > 0 else 0.0
+        planned = planned_gmv / planned_ped if planned_ped > 0 else 0.0
+        projection = proj_gmv / proj_ped if proj_ped > 0 else 0.0
+        
+    return actual, planned, projection
+
+# 2. CALCULATION OF THE 4 CORE KPI VALUES
+gmv_act, gmv_pla, gmv_prj = get_kpi_metrics("GMV")
+rec_act, rec_pla, rec_prj = get_kpi_metrics("Receita Hanzo")
+ped_act, ped_pla, ped_prj = get_kpi_metrics("Pedidos")
+tkt_act, tkt_pla, tkt_prj = get_kpi_metrics("Ticket Médio")
+
+kpis_values = {
+    "GMV": {"actual": gmv_act, "plan": gmv_pla, "proj": gmv_prj},
+    "Receita Hanzo": {"actual": rec_act, "plan": rec_pla, "proj": rec_prj},
+    "Pedidos": {"actual": ped_act, "plan": ped_pla, "proj": ped_prj},
+    "Ticket Médio": {"actual": tkt_act, "plan": tkt_pla, "proj": tkt_prj}
+}
+
+# Calculate overall status badge based on achievements
+kpi_achievements = []
+for k, v in kpis_values.items():
+    if v["plan"] > 0:
+        ach = v["proj"] / v["plan"] if "YTD" in viz_mode or "MTD" in viz_mode else v["actual"] / v["plan"]
+    else:
+        ach = 0.0
+    kpi_achievements.append(ach)
+
+avg_kpi_ach = sum(kpi_achievements) / 4
+if avg_kpi_ach >= 0.95:
+    overall_farol, overall_status, badge_class = "🟢", "Dentro da Meta", "status-green"
+elif avg_kpi_ach >= 0.90:
+    overall_farol, overall_status, badge_class = "🟡", "Atenção", "status-yellow"
+else:
+    overall_farol, overall_status, badge_class = "🔴", "Abaixo da Meta", "status-red"
+
 # Header Row
 col_title, col_status = st.columns([3, 1])
-
-# Header Title
 with col_title:
     st.markdown(f'''
     <div class="cockpit-header">
@@ -336,126 +472,12 @@ with col_title:
         <div class="cockpit-subtitle">
             Mês: <b>{month_sel_pt} 2026</b> | 
             Semana: <b>{week_sel_label}</b> | 
+            Modo: <b>{viz_mode[2:]}</b> | 
+            Grupo: <b>{group_filter}</b> | 
             Última Atualização: {last_modified.strftime("%d/%m/%Y %H:%M:%S")}
         </div>
     </div>
     ''', unsafe_allow_html=True)
-
-# 2x2 Grid Columns Layout
-st.markdown('<br>', unsafe_allow_html=True)
-row1_col1, row1_col2 = st.columns(2)
-row2_col1, row2_col2 = st.columns(2)
-
-metrics_setup = [
-    {
-        "slot": row1_col1,
-        "title": "GMV COMERCIAL",
-        "key": "GMV",
-        "fmt": fmt_currency,
-        "is_monetary": True
-    },
-    {
-        "slot": row1_col2,
-        "title": "FATURAMENTO (RECEITA)",
-        "key": "Receita Hanzo",
-        "fmt": fmt_currency,
-        "is_monetary": True
-    },
-    {
-        "slot": row2_col1,
-        "title": "PEDIDOS ENTREGUES",
-        "key": "Pedidos",
-        "fmt": fmt_qty,
-        "is_monetary": False
-    },
-    {
-        "slot": row2_col2,
-        "title": "TICKET MÉDIO",
-        "key": "Ticket Médio",
-        "fmt": fmt_currency,
-        "is_monetary": True
-    }
-]
-
-# Calculate overall status badge based on monthly cards achievements
-achievements_list = []
-
-for m_info in metrics_setup:
-    metric_key = m_info["key"]
-    
-    # 1. MONTHLY DATA (from Planejamento)
-    gmv_plan_m = sum(data_loader.clean_val(monthly_data[c]["GMV"]["plan"][month_sel_en]) for c in filtered_clients)
-    gmv_real_m = sum(data_loader.clean_val(monthly_data[c]["GMV"]["real"][month_sel_en]) for c in filtered_clients)
-    
-    ped_plan_m = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["plan"][month_sel_en]) for c in filtered_clients)
-    ped_real_m = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["real"][month_sel_en]) for c in filtered_clients)
-    
-    rec_plan_m = sum(data_loader.clean_val(monthly_data[c]["Receita Hanzo"]["plan"][month_sel_en]) for c in filtered_clients)
-    rec_real_m = sum(data_loader.clean_val(monthly_data[c]["Receita Hanzo"]["real"][month_sel_en]) for c in filtered_clients)
-    
-    if metric_key == "GMV":
-        m_plan_m = gmv_plan_m
-        m_real_m = gmv_real_m
-    elif metric_key == "Receita Hanzo":
-        m_plan_m = rec_plan_m
-        m_real_m = rec_real_m
-    elif metric_key == "Pedidos":
-        m_plan_m = ped_plan_m
-        m_real_m = ped_real_m
-    else: # Ticket Médio
-        # Monthly Average Ticket must be calculated as Monthly Actual GMV / Monthly Actual Orders
-        m_plan_m = gmv_plan_m / ped_plan_m if ped_plan_m > 0 else 0.0
-        m_real_m = gmv_real_m / ped_real_m if ped_real_m > 0 else 0.0
-        
-    # Calculate Weekly accumulated actual from Projeção up to selected week
-    real_accum_weekly = 0.0
-    for w in range(selected_week_idx + 1):
-        for client in filtered_clients:
-            if metric_key == "Ticket Médio":
-                # Accumulated GMV / Accumulated Orders
-                acc_gmv_wk = sum(data_loader.clean_val(weekly_data[client]["GMV"]["weekly"][month_sel_en][i]) for i in range(w+1))
-                acc_ped_wk = sum(data_loader.clean_val(weekly_data[client]["Pedidos"]["weekly"][month_sel_en][i]) for i in range(w+1))
-                real_accum_weekly = acc_gmv_wk / acc_ped_wk if acc_ped_wk > 0 else 0.0
-            else:
-                real_accum_weekly += data_loader.clean_val(weekly_data[client][metric_key]["weekly"][month_sel_en][w])
-                
-    # Calculate Projeção pelo ritmo atual
-    # Elapsed weeks count containing actual GMV data > 0
-    elapsed_w_data = 0
-    for w in range(selected_week_idx + 1):
-        w_sum = sum(data_loader.clean_val(weekly_data[c]["GMV"]["weekly"][month_sel_en][w]) for c in weekly_data)
-        if w_sum > 0:
-            elapsed_w_data += 1
-    K = max(1, elapsed_w_data)
-    
-    if metric_key == "Ticket Médio":
-        # Projection of Ticket = Projected GMV / Projected Orders
-        acc_gmv_sel = sum(data_loader.clean_val(weekly_data[c]["GMV"]["weekly"][month_sel_en][w]) for c in filtered_clients for w in range(selected_week_idx + 1))
-        acc_ped_sel = sum(data_loader.clean_val(weekly_data[c]["Pedidos"]["weekly"][month_sel_en][w]) for c in filtered_clients for w in range(selected_week_idx + 1))
-        
-        proj_gmv_r = (acc_gmv_sel / K) * num_weeks
-        proj_ped_r = (acc_ped_sel / K) * num_weeks
-        
-        proj_ritmo = proj_gmv_r / proj_ped_r if proj_ped_r > 0 else 0.0
-    else:
-        proj_ritmo = (real_accum_weekly / K) * num_weeks
-        
-    # Achievement %
-    if m_plan_m > 0:
-        ach_pct = proj_ritmo / m_plan_m
-    else:
-        ach_pct = 0.0
-        
-    achievements_list.append((metric_key, m_plan_m, ach_pct))
-
-# Overall status card calculation
-overall_ach = sum(ach[2] for ach in achievements_list) / 4
-if overall_ach >= 0.95:
-    overall_farol, overall_status, badge_class = "🟢", "Dentro da Meta", "status-green"
-elif overall_ach >= 0.90:
-    overall_farol, overall_status, badge_class = "🟡", "Atenção", "status-yellow"
-else:
-    overall_farol, overall_status, badge_class = "🔴", "Abaixo da Meta", "status-red"
 
 with col_status:
     st.markdown(f'''
@@ -466,393 +488,409 @@ with col_status:
     </div>
     ''', unsafe_allow_html=True)
 
+# 2. EXECUTIVE KPI CARDS ROW (at the top)
+col_c1, col_c2, col_c3, col_c4 = st.columns(4)
 
-# Render all blocks
-for m_info in metrics_setup:
-    metric_key = m_info["key"]
+kpis_setup = [
+    {"col": col_c1, "title": "GMV COMERCIAL", "key": "GMV", "fmt": fmt_currency},
+    {"col": col_c2, "title": "FATURAMENTO (RECEITA)", "key": "Receita Hanzo", "fmt": fmt_currency},
+    {"col": col_c3, "title": "PEDIDOS ENTREGUES", "key": "Pedidos", "fmt": fmt_qty},
+    {"col": col_c4, "title": "TICKET MÉDIO", "key": "Ticket Médio", "fmt": fmt_currency}
+]
+
+for card in kpis_setup:
+    k_key = card["key"]
+    c_vals = kpis_values[k_key]
     
-    # 1. MONTHLY CALCULATIONS (Planejamento)
-    gmv_plan_m = sum(data_loader.clean_val(monthly_data[c]["GMV"]["plan"][month_sel_en]) for c in filtered_clients)
-    gmv_real_m = sum(data_loader.clean_val(monthly_data[c]["GMV"]["real"][month_sel_en]) for c in filtered_clients)
-    
-    ped_plan_m = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["plan"][month_sel_en]) for c in filtered_clients)
-    ped_real_m = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["real"][month_sel_en]) for c in filtered_clients)
-    
-    rec_plan_m = sum(data_loader.clean_val(monthly_data[c]["Receita Hanzo"]["plan"][month_sel_en]) for c in filtered_clients)
-    rec_real_m = sum(data_loader.clean_val(monthly_data[c]["Receita Hanzo"]["real"][month_sel_en]) for c in filtered_clients)
-    
-    if metric_key == "GMV":
-        m_plan_m = gmv_plan_m
-        m_real_m = gmv_real_m
-    elif metric_key == "Receita Hanzo":
-        m_plan_m = rec_plan_m
-        m_real_m = rec_real_m
-    elif metric_key == "Pedidos":
-        m_plan_m = ped_plan_m
-        m_real_m = ped_real_m
-    else: # Ticket Médio
-        m_plan_m = gmv_plan_m / ped_plan_m if ped_plan_m > 0 else 0.0
-        m_real_m = gmv_real_m / ped_real_m if ped_real_m > 0 else 0.0
-
-    # 2. WEEKLY AND CHALLENGE CALCULATIONS (Projeção)
-    # Realized weekly accumulated up to W
-    real_accum_weekly = 0.0
-    for w in range(selected_week_idx + 1):
-        for client in filtered_clients:
-            if metric_key == "Ticket Médio":
-                acc_gmv_wk = sum(data_loader.clean_val(weekly_data[client]["GMV"]["weekly"][month_sel_en][i]) for i in range(w+1))
-                acc_ped_wk = sum(data_loader.clean_val(weekly_data[client]["Pedidos"]["weekly"][month_sel_en][i]) for i in range(w+1))
-                real_accum_weekly = acc_gmv_wk / acc_ped_wk if acc_ped_wk > 0 else 0.0
-            else:
-                real_accum_weekly += data_loader.clean_val(weekly_data[client][metric_key]["weekly"][month_sel_en][w])
-
-    # Count elapsed weeks containing actual data up to selected week
-    elapsed_w_data = 0
-    for w in range(selected_week_idx + 1):
-        w_sum = sum(data_loader.clean_val(weekly_data[c]["GMV"]["weekly"][month_sel_en][w]) for c in weekly_data)
-        if w_sum > 0:
-            elapsed_w_data += 1
-    K = max(1, elapsed_w_data)
-
-    if metric_key == "Ticket Médio":
-        acc_gmv_sel = sum(data_loader.clean_val(weekly_data[c]["GMV"]["weekly"][month_sel_en][w]) for c in filtered_clients for w in range(selected_week_idx + 1))
-        acc_ped_sel = sum(data_loader.clean_val(weekly_data[c]["Pedidos"]["weekly"][month_sel_en][w]) for c in filtered_clients for w in range(selected_week_idx + 1))
-        proj_gmv_r = (acc_gmv_sel / K) * num_weeks
-        proj_ped_r = (acc_ped_sel / K) * num_weeks
-        proj_ritmo = proj_gmv_r / proj_ped_r if proj_ped_r > 0 else 0.0
-    else:
-        proj_ritmo = (real_accum_weekly / K) * num_weeks
-
-    # Card Atingimento % and Farol
-    if m_plan_m == 0:
-        ach_pct_str = "Meta não definida"
+    # Gap % calculation
+    if c_vals["plan"] == 0:
+        gap_pct_str = "Meta não definida"
         card_farol = "—"
-        ach_color = "#64748B"
+        card_color = "#64748B"
     else:
-        ach_pct_val = proj_ritmo / m_plan_m
-        ach_pct_str = f"{ach_pct_val*100:.1f}%"
-        if ach_pct_val >= 0.95:
+        gap_val = ((c_vals["actual"] - c_vals["plan"]) / c_vals["plan"]) * 100
+        gap_pct_str = f"{gap_val:+.1f}%".replace(".", ",")
+        
+        ach_pct = c_vals["proj"] / c_vals["plan"] if "YTD" in viz_mode or "MTD" in viz_mode else c_vals["actual"] / c_vals["plan"]
+        if ach_pct >= 0.95:
             card_farol = "🟢"
-            ach_color = "#166534"
-        elif ach_pct_val >= 0.90:
+            card_color = "#166534"
+        elif ach_pct >= 0.90:
             card_farol = "🟡"
-            ach_color = "#854D0E"
+            card_color = "#854D0E"
         else:
             card_farol = "🔴"
-            ach_color = "#991B1B"
-
-    # Meta do mês (from Projeção) for challenge section
-    if metric_key == "Ticket Médio":
-        p_gmv_tgt = sum(data_loader.clean_val(weekly_data[c]["GMV"]["plan"][month_sel_en]) for c in filtered_clients)
-        p_ped_tgt = sum(data_loader.clean_val(weekly_data[c]["Pedidos"]["plan"][month_sel_en]) for c in filtered_clients)
-        target_weekly_m = p_gmv_tgt / p_ped_tgt if p_ped_tgt > 0 else 0.0
-    else:
-        target_weekly_m = sum(data_loader.clean_val(weekly_data[c][metric_key]["plan"][month_sel_en]) for c in filtered_clients)
-
-    # Spreadsheet Diferença and Comparativo source priority (Diferença = Real - Plan)
-    # Check if we are at the latest week and can read spreadsheet values directly
-    is_latest_wk = (selected_week_idx == num_weeks - 1)
-    
-    diff_val = None
-    comp_val = None
-    if is_latest_wk:
-        # Load sum of client diffs from Projeção sheet
-        diff_list = [weekly_data[c][metric_key]["diff"][month_sel_en] for c in filtered_clients]
-        comp_list = [weekly_data[c][metric_key]["comp"][month_sel_en] for c in filtered_clients]
-        
-        diff_numeric = [clean_val(x) for x in diff_list if x is not None and not pd.isna(x)]
-        if len(diff_numeric) == len(filtered_clients):
-            # Target challenge diff is Plan - Realized, which is negative of spreadsheet diff
-            diff_val = -sum(diff_numeric)
+            card_color = "#991B1B"
             
-        comp_numeric = [clean_val(x) for x in comp_list if x is not None and not pd.isna(x)]
-        if len(comp_numeric) == len(filtered_clients) and target_weekly_m > 0:
-            comp_val = (real_accum_weekly / target_weekly_m) * 100
-
-    # Recalculate fallback
-    if diff_val is None:
-        diff_val = target_weekly_m - real_accum_weekly
-    if comp_val is None:
-        comp_val = (real_accum_weekly / target_weekly_m) * 100 if target_weekly_m > 0 else 0.0
-
-    # Calculate remaining weeks dynamically based on columns left
-    remaining_weeks = len(weekly_cols) - (selected_week_idx + 1)
-
-    # Challenge card display conditionals
-    if target_weekly_m == 0:
-        challenge_msg = "Meta não definida"
-        req_avg_str = "0"
-        challenge_status = "—"
-        challenge_color = "#64748B"
-    elif diff_val <= 0:
-        challenge_msg = "Meta já atingida"
-        req_avg_str = "0"
-        challenge_status = "🟢"
-        challenge_color = "#166534"
-    else:
-        challenge_msg = f"Faltam {m_info['fmt'](diff_val)} para atingir a meta."
-        if remaining_weeks > 0:
-            req_avg_val = diff_val / remaining_weeks
-            req_avg_str = m_info["fmt"](req_avg_val)
-            challenge_status = "🟡"
-            challenge_color = "#854D0E"
-        else:
-            # Final week reached
-            challenge_msg = "Mês encerrado abaixo da meta"
-            req_avg_str = "N/A"
-            challenge_status = "🔴"
-            challenge_color = "#991B1B"
-
-    # Render on layout slot
-    with m_info["slot"]:
-        # MONTHLY KPI CARD
+    with card["col"]:
         st.markdown(f'''
-        <div class="cockpit-card">
-            <div class="card-title">MENSAL — {m_info["title"]}</div>
-            <div class="kpi-main-val">{m_info["fmt"](m_real_m)}</div>
-            <div style="display:flex; justify-content:space-between; margin-top:0.5rem;">
+        <div class="kpi-card">
+            <div class="kpi-card-title">{card["title"]}</div>
+            <div class="kpi-main-val" style="font-size:30px !important;">{card["fmt"](c_vals["actual"])}</div>
+            <div class="kpi-sub-row">
                 <div>
                     <div class="kpi-sub-label">PLANEJADO</div>
-                    <div class="kpi-sub-val">{m_info["fmt"](m_plan_m)}</div>
+                    <div class="kpi-sub-val">{card["fmt"](c_vals["plan"])}</div>
                 </div>
                 <div>
-                    <div class="kpi-sub-label">PROJEÇÃO PELO RITMO ATUAL</div>
-                    <div class="kpi-sub-val">{m_info["fmt"](proj_ritmo)}</div>
+                    <div class="kpi-sub-label">PROJEÇÃO RITMO ATUAL</div>
+                    <div class="kpi-sub-val">{card["fmt"](c_vals["proj"])}</div>
                 </div>
             </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.5rem; border-top:1px solid #F1F5F9; padding-top:0.5rem;">
-                <span style="font-size:0.85rem; font-weight:700; color:#475569;">Atingimento Projetado:</span>
-                <span style="font-size:0.95rem; font-weight:800; color:{ach_color};">
-                    {ach_pct_str} <span class="kpi-light">{card_farol}</span>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.4rem; border-top:1px solid #E2E8F0; padding-top:0.4rem;">
+                <span style="font-size:0.8rem; font-weight:700; color:#475569;">Desvio Real/Plan:</span>
+                <span style="font-size:0.85rem; font-weight:800; color:{card_color};">
+                    {gap_pct_str} <span class="kpi-light">{card_farol}</span>
                 </span>
             </div>
         </div>
         ''', unsafe_allow_html=True)
-        st.markdown('<br>', unsafe_allow_html=True)
-        
-        # PREPARE CLIENTS DATA FOR RANKINGS
-        client_ranks = []
-        for client in filtered_clients:
-            # Weekly actual
-            if metric_key == "Ticket Médio":
-                wk_gmv = data_loader.clean_val(weekly_data[client]["GMV"]["weekly"][month_sel_en][selected_week_idx])
-                wk_ped = data_loader.clean_val(weekly_data[client]["Pedidos"]["weekly"][month_sel_en][selected_week_idx])
-                # Exclude from Ticket Médio rankings if selected-week orders is 0 (prevents division by zero)
-                if wk_ped == 0:
-                    continue
-                val_wk = wk_gmv / wk_ped
-            else:
-                val_wk = data_loader.clean_val(weekly_data[client][metric_key]["weekly"][month_sel_en][selected_week_idx])
+
+st.markdown('<br>', unsafe_allow_html=True)
+
+# 2x2 Quadrants Layout
+row1_col1, row1_col2 = st.columns(2)
+row2_col1, row2_col2 = st.columns(2)
+
+quadrants_setup = [
+    {
+        "slot": row1_col1,
+        "title": "GMV COMERCIAL",
+        "key": "GMV",
+        "fmt": fmt_currency,
+        "is_ticket": False
+    },
+    {
+        "slot": row1_col2,
+        "title": "FATURAMENTO (RECEITA)",
+        "key": "Receita Hanzo",
+        "fmt": fmt_currency,
+        "is_ticket": False
+    },
+    {
+        "slot": row2_col1,
+        "title": "PEDIDOS ENTREGUES",
+        "key": "Pedidos",
+        "fmt": fmt_qty,
+        "is_ticket": False
+    },
+    {
+        "slot": row2_col2,
+        "title": "TICKET MÉDIO",
+        "key": "Ticket Médio",
+        "fmt": fmt_currency,
+        "is_ticket": True
+    }
+]
+
+for quad in quadrants_setup:
+    q_key = quad["key"]
+    
+    # 1. EXTRACT DATA LIST PER CLIENT FOR RANKINGS (based on Mode)
+    client_data_list = []
+    for client in filtered_clients:
+        if "YTD" in viz_mode:
+            curr_val = sum(data_loader.clean_val(monthly_data[client][q_key]["real"][m]) for m in months_up_to)
+            accum_val = sum(data_loader.clean_val(monthly_data[client][q_key]["plan"][m]) for m in months_up_to)
+            orders_count = sum(data_loader.clean_val(monthly_data[client]["Pedidos"]["real"][m]) for m in months_up_to)
+            
+            if quad["is_ticket"]:
+                acc_gmv = sum(data_loader.clean_val(monthly_data[client]["GMV"]["real"][m]) for m in months_up_to)
+                curr_val = acc_gmv / orders_count if orders_count > 0 else 0.0
                 
-            # Accumulated actual
-            if metric_key == "Ticket Médio":
-                acc_gmv = sum(data_loader.clean_val(weekly_data[client]["GMV"]["weekly"][month_sel_en][i]) for i in range(selected_week_idx + 1))
-                acc_ped = sum(data_loader.clean_val(weekly_data[client]["Pedidos"]["weekly"][month_sel_en][i]) for i in range(selected_week_idx + 1))
-                val_accum = acc_gmv / acc_ped if acc_ped > 0 else 0.0
-            else:
-                val_accum = sum(data_loader.clean_val(weekly_data[client][metric_key]["weekly"][month_sel_en][i]) for i in range(selected_week_idx + 1))
-                
-            # Planned prorated target
-            target_cl = data_loader.clean_val(weekly_data[client][metric_key]["plan"][month_sel_en])
-            # Load weights row from active sheet
+                acc_gmv_plan = sum(data_loader.clean_val(monthly_data[client]["GMV"]["plan"][m]) for m in months_up_to)
+                acc_ped_plan = sum(data_loader.clean_val(monthly_data[client]["Pedidos"]["plan"][m]) for m in months_up_to)
+                accum_val = acc_gmv_plan / acc_ped_plan if acc_ped_plan > 0 else 0.0
+        else:
+            weekly_cols_active = m_map_proj[month_sel_en]["weekly"]
             weights_row = df_proj.iloc[3]
-            weekly_weights = [data_loader.clean_val(weights_row[col]) for col in weekly_cols]
+            weekly_weights = [data_loader.clean_val(weights_row[col]) for col in weekly_cols_active]
             sum_weights = sum(weekly_weights)
             if sum_weights == 0:
-                weekly_weights = [1.0 / len(weekly_cols)] * len(weekly_cols)
+                weekly_weights = [1.0 / len(weekly_cols_active)] * len(weekly_cols_active)
             else:
                 weekly_weights = [w / sum_weights for w in weekly_weights]
-            prorated_target_cl = target_cl * sum(weekly_weights[:selected_week_idx + 1])
+                
+            target_m = data_loader.clean_val(weekly_data[client][q_key]["plan"][month_sel_en])
+            prorated_target = target_m * sum(weekly_weights[:selected_week_idx + 1])
             
-            # Achievement and Farol
-            is_zero_zero = (prorated_target_cl == 0 and val_accum == 0)
-            if is_zero_zero:
-                cl_ach_str = "- %"
-                cl_farol = "—"
-            elif target_cl == 0:
-                cl_ach_str = "- %"
-                cl_farol = "—"
-            else:
-                if prorated_target_cl > 0:
-                    cl_ach_val = val_accum / prorated_target_cl
-                    cl_ach_str = f"{cl_ach_val*100:.1f}%"
-                    if cl_ach_val >= 0.95:
-                        cl_farol = "🟢"
-                    elif cl_ach_val >= 0.90:
-                        cl_farol = "🟡"
-                    else:
-                        cl_farol = "🔴"
-                else:
-                    cl_ach_str = "100,0%"
-                    cl_farol = "🟢"
+            if "Week" in viz_mode:
+                curr_val = data_loader.clean_val(weekly_data[client][q_key]["weekly"][month_sel_en][selected_week_idx])
+                accum_val = sum(data_loader.clean_val(weekly_data[client][q_key]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
+                orders_count = data_loader.clean_val(weekly_data[client]["Pedidos"]["weekly"][month_sel_en][selected_week_idx])
+                
+                if quad["is_ticket"]:
+                    wk_gmv = data_loader.clean_val(weekly_data[client]["GMV"]["weekly"][month_sel_en][selected_week_idx])
+                    if orders_count == 0:
+                        continue
+                    curr_val = wk_gmv / orders_count
                     
-            client_ranks.append({
-                "client": client,
-                "wk_val": val_wk,
-                "accum": val_accum,
-                "ach_str": cl_ach_str,
-                "farol": cl_farol
-            })
+                    acc_gmv_wk = sum(data_loader.clean_val(weekly_data[client]["GMV"]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
+                    acc_ped_wk = sum(data_loader.clean_val(weekly_data[client]["Pedidos"]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
+                    accum_val = acc_gmv_wk / acc_ped_wk if acc_ped_wk > 0 else 0.0
+            else:
+                curr_val = sum(data_loader.clean_val(weekly_data[client][q_key]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
+                accum_val = sum(data_loader.clean_val(monthly_data[client][q_key]["real"][m]) for m in months_up_to)
+                
+                orders_count = sum(data_loader.clean_val(weekly_data[client]["Pedidos"]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
+                
+                if quad["is_ticket"]:
+                    acc_gmv_wk = sum(data_loader.clean_val(weekly_data[client]["GMV"]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
+                    if orders_count == 0:
+                        continue
+                    curr_val = acc_gmv_wk / orders_count
+                    
+                    ytd_gmv = sum(data_loader.clean_val(monthly_data[client]["GMV"]["real"][m]) for m in months_up_to)
+                    ytd_ped = sum(data_loader.clean_val(monthly_data[client]["Pedidos"]["real"][m]) for m in months_up_to)
+                    accum_val = ytd_gmv / ytd_ped if ytd_ped > 0 else 0.0
+                    
+        client_data_list.append({
+            "client": client,
+            "curr": curr_val,
+            "accum": accum_val,
+            "orders": orders_count
+        })
+
+    group_curr_total = sum(c["curr"] for c in client_data_list)
+
+    sorted_top = sorted(client_data_list, key=lambda x: (-x["curr"], x["client"]))
+    
+    filtered_bottom = [r for r in client_data_list if r["curr"] > 0 and r["accum"] > 0 and r["client"].strip() != ""]
+    sorted_bottom = sorted(filtered_bottom, key=lambda x: (x["curr"], x["client"]))
+
+    if "YTD" in viz_mode:
+        if quad["is_ticket"]:
+            g_tgt = sum(data_loader.clean_val(monthly_data[c]["GMV"]["plan"][m]) for c in filtered_clients for m in EN_MONTHS)
+            p_tgt = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["plan"][m]) for c in filtered_clients for m in EN_MONTHS)
+            target_val = g_tgt / p_tgt if p_tgt > 0 else 0.0
+        else:
+            target_val = sum(data_loader.clean_val(monthly_data[c][q_key]["plan"][m]) for c in filtered_clients for m in EN_MONTHS)
+        accum_challenge = kpis_values[q_key]["actual"]
+    else:
+        if quad["is_ticket"]:
+            g_tgt = sum(data_loader.clean_val(weekly_data[c]["GMV"]["plan"][month_sel_en]) for c in filtered_clients)
+            p_tgt = sum(data_loader.clean_val(weekly_data[c]["Pedidos"]["plan"][month_sel_en]) for c in filtered_clients)
+            target_val = g_tgt / p_tgt if p_tgt > 0 else 0.0
+        else:
+            target_val = sum(data_loader.clean_val(weekly_data[c][q_key]["plan"][month_sel_en]) for c in filtered_clients)
+        accum_challenge = kpis_values[q_key]["actual"]
+
+    diff_challenge = None
+    is_latest_wk = (selected_week_idx == len(weekly_cols) - 1)
+    
+    if is_latest_wk and "YTD" not in viz_mode:
+        diff_list = [weekly_data[c][q_key]["diff"][month_sel_en] for c in filtered_clients]
+        diff_numeric = [clean_val(x) for x in diff_list if x is not None and not pd.isna(x)]
+        if len(diff_numeric) == len(filtered_clients):
+            diff_challenge = -sum(diff_numeric)
             
-        # TOP 5 da Semana
-        sorted_top = sorted(client_ranks, key=lambda x: (-x["wk_val"], x["client"]))
+    if diff_challenge is None:
+        diff_challenge = target_val - accum_challenge
+
+    if "YTD" in viz_mode:
+        remaining_months_count = 11 - EN_MONTHS.index(month_sel_en)
+        weeks_left_curr = len(weekly_cols) - (selected_week_idx + 1)
+        rem_weeks = weeks_left_curr + (4 * remaining_months_count)
+    else:
+        rem_weeks = len(weekly_cols) - (selected_week_idx + 1)
+
+    if target_val == 0:
+        challenge_msg = "Meta não definida"
+        req_avg_str = "0"
+        challenge_status = "—"
+        challenge_color = "#64748B"
+        badge_theme = "status-neutral"
+    elif diff_challenge <= 0:
+        challenge_msg = "Meta já atingida"
+        req_avg_str = "0"
+        challenge_status = "🟢"
+        challenge_color = "#166534"
+        badge_theme = "status-green"
+    else:
+        challenge_msg = f"Faltam {quad['fmt'](diff_challenge)} para atingir a meta."
+        if rem_weeks > 0:
+            req_avg_val = diff_challenge / rem_weeks
+            req_avg_str = quad["fmt"](req_avg_val)
+            challenge_status = "🟡"
+            challenge_color = "#854D0E"
+            badge_theme = "status-yellow"
+        else:
+            challenge_msg = "Mês encerrado abaixo da meta" if "YTD" not in viz_mode else "Ano encerrado abaixo da meta"
+            req_avg_str = "N/A"
+            challenge_status = "🔴"
+            challenge_color = "#991B1B"
+            badge_theme = "status-red"
+
+    with quad["slot"]:
+        st.markdown(f'<div class="quadrant-container">', unsafe_allow_html=True)
+        st.markdown(f'<div class="quadrant-title">{quad["title"]}</div>', unsafe_allow_html=True)
         
+        # TOP 5 CLIENTS TABLE
+        st.markdown(f'<div class="table-section-title">Top 5 Clients</div>', unsafe_allow_html=True)
         st.markdown(f'''
-        <div class="cockpit-card">
-            <div class="card-title">Quem Puxou o Resultado? (Top 5 da Semana)</div>
-            <table class="compact-table">
-                <thead>
-                    <tr>
-                        <th>Rk</th>
-                        <th>Cliente</th>
-                        <th>Real da Semana</th>
-                        <th>Real Acumulado</th>
-                        <th>Atingimento</th>
-                        <th>Farol</th>
-                    </tr>
-                </thead>
-                <tbody>
+        <table class="compact-table" style="font-size: 13px !important;">
+            <thead>
+                <tr>
+                    <th style="width:10%;">Rank</th>
+                    <th style="width:40%;">Cliente</th>
+                    <th style="width:20%;">Valor Atual</th>
+                    <th style="width:15%;">{"Pedidos" if quad["is_ticket"] else "Share %"}</th>
+                    <th style="width:15%;">Valor Acumulado</th>
+                </tr>
+            </thead>
+            <tbody>
         ''', unsafe_allow_html=True)
         
-        for r_num, row in enumerate(sorted_top[:5]):
+        for idx, row in enumerate(sorted_top[:5]):
+            share_str = f"{row['orders']:.0f}" if quad["is_ticket"] else (f"{(row['curr']/group_curr_total)*100:.1f}%" if group_curr_total > 0 else "0.0%")
             st.markdown(f'''
-                    <tr>
-                        <td><b>{r_num+1}</b></td>
-                        <td>{row["client"]}</td>
-                        <td>{m_info["fmt"](row["wk_val"])}</td>
-                        <td>{m_info["fmt"](row["accum"])}</td>
-                        <td>{row["ach_str"]}</td>
-                        <td>{row["farol"]}</td>
-                    </tr>
+                <tr>
+                    <td><b>{idx+1}</b></td>
+                    <td>{row["client"]}</td>
+                    <td>{quad["fmt"](row["curr"])}</td>
+                    <td>{share_str}</td>
+                    <td>{quad["fmt"](row["accum"])}</td>
+                </tr>
             ''', unsafe_allow_html=True)
             
-        st.markdown('</tbody></table></div>', unsafe_allow_html=True)
-        st.markdown('<br>', unsafe_allow_html=True)
+        st.markdown('</tbody></table>', unsafe_allow_html=True)
+        st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
         
-        # BOTTOM 5 da Semana (Positive performers only)
-        # Filters: val_wk > 0, accum > 0, non-blank name
-        filtered_bottom = [r for r in client_ranks if r["wk_val"] > 0 and r["accum"] > 0 and r["client"].strip() != ""]
-        sorted_bottom = sorted(filtered_bottom, key=lambda x: (x["wk_val"], x["client"]))
-        
+        # BOTTOM 5 CLIENTS WITH ACTIVITY TABLE
+        st.markdown(f'<div class="table-section-title">Bottom 5 Clients with Activity</div>', unsafe_allow_html=True)
         st.markdown(f'''
-        <div class="cockpit-card">
-            <div class="card-title">Quem Prejudicou o Resultado? (Bottom 5 da Semana)</div>
-            <table class="compact-table">
-                <thead>
-                    <tr>
-                        <th>Rk</th>
-                        <th>Cliente</th>
-                        <th>Real da Semana</th>
-                        <th>Real Acumulado</th>
-                        <th>Atingimento</th>
-                        <th>Farol</th>
-                    </tr>
-                </thead>
-                <tbody>
+        <table class="compact-table" style="font-size: 13px !important;">
+            <thead>
+                <tr>
+                    <th style="width:10%;">Rank</th>
+                    <th style="width:40%;">Cliente</th>
+                    <th style="width:20%;">Valor Atual</th>
+                    <th style="width:15%;">{"Pedidos" if quad["is_ticket"] else "Share %"}</th>
+                    <th style="width:15%;">Valor Acumulado</th>
+                </tr>
+            </thead>
+            <tbody>
         ''', unsafe_allow_html=True)
         
-        for r_num, row in enumerate(sorted_bottom[:5]):
+        for idx, row in enumerate(sorted_bottom[:5]):
+            share_str = f"{row['orders']:.0f}" if quad["is_ticket"] else (f"{(row['curr']/group_curr_total)*100:.1f}%" if group_curr_total > 0 else "0.0%")
             st.markdown(f'''
-                    <tr>
-                        <td><b>{r_num+1}</b></td>
-                        <td>{row["client"]}</td>
-                        <td>{m_info["fmt"](row["wk_val"])}</td>
-                        <td>{m_info["fmt"](row["accum"])}</td>
-                        <td>{row["ach_str"]}</td>
-                        <td>{row["farol"]}</td>
-                    </tr>
+                <tr>
+                    <td><b>{idx+1}</b></td>
+                    <td>{row["client"]}</td>
+                    <td>{quad["fmt"](row["curr"])}</td>
+                    <td>{share_str}</td>
+                    <td>{quad["fmt"](row["accum"])}</td>
+                </tr>
             ''', unsafe_allow_html=True)
             
-        st.markdown('</tbody></table></div>', unsafe_allow_html=True)
-        st.markdown('<br>', unsafe_allow_html=True)
+        if not sorted_bottom:
+            st.markdown('<tr><td colspan="5" style="text-align:center; color:#64748B;">Nenhum cliente ativo no período.</td></tr>', unsafe_allow_html=True)
+            
+        st.markdown('</tbody></table>', unsafe_allow_html=True)
+        st.markdown('<div style="height:20px;"></div>', unsafe_allow_html=True)
         
-        # DESAFIO PARA A META CARD
-        st.markdown(f'''
-        <div class="cockpit-card">
-            <div class="card-title">Desafio para a Meta (Semanal)</div>
-            <div style="font-size:1.15rem; font-weight:800; color:{challenge_color}; margin-bottom:0.75rem;">
-                {challenge_status} {challenge_msg}
-            </div>
-            <div style="display:flex; justify-content:space-between;">
-                <div>
-                    <div class="kpi-sub-label">Semanas Restantes</div>
-                    <div class="kpi-sub-val" style="font-size:1.1rem;">{remaining_weeks}</div>
-                </div>
-                <div>
-                    <div class="kpi-sub-label">Necessidade Média por Semana Restante</div>
-                    <div class="kpi-sub-val" style="font-size:1.1rem; color:{challenge_color};">{req_avg_str}</div>
-                </div>
-            </div>
-        </div>
-        ''', unsafe_allow_html=True)
-        st.markdown('<br>', unsafe_allow_html=True)
+        # EVOLUTION CHART
+        st.markdown(f'<div class="table-section-title">Evolução Histórica</div>', unsafe_allow_html=True)
         
-        # MONTH-OVER-MONTH EVOLUTION CHART (Planejamento)
-        # Pull values for all 12 months
-        plan_MoM = []
-        real_MoM = []
-        months_names_pt = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
-        
-        for m in EN_MONTHS:
-            if m in m_map_pl:
-                cl_plan = sum(data_loader.clean_val(monthly_data[c][metric_key]["plan"][m]) for c in filtered_clients)
-                cl_real = sum(data_loader.clean_val(monthly_data[c][metric_key]["real"][m]) for c in filtered_clients)
-                
-                # Special average ticket logic for MoM totals
-                if metric_key == "Ticket Médio":
-                    g_plan = sum(data_loader.clean_val(monthly_data[c]["GMV"]["plan"][m]) for c in filtered_clients)
-                    p_plan = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["plan"][m]) for c in filtered_clients)
-                    cl_plan = g_plan / p_plan if p_plan > 0 else 0.0
-                    
-                    g_real = sum(data_loader.clean_val(monthly_data[c]["GMV"]["real"][m]) for c in filtered_clients)
-                    p_real = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["real"][m]) for c in filtered_clients)
-                    cl_real = g_real / p_real if p_real > 0 else 0.0
-            else:
-                cl_plan = 0.0
-                cl_real = 0.0
-                
-            plan_MoM.append(cl_plan)
-            # Only append real value if it represents a past month or current month containing data
-            if cl_real > 0 or m == month_sel_en:
-                real_MoM.append(cl_real)
-            else:
-                real_MoM.append(None)
-                
-        # Draw plotly line chart MoM
         fig = go.Figure()
         
-        # Planejado
-        fig.add_trace(go.Scatter(
-            x=months_names_pt,
-            y=plan_MoM,
-            name="Planejado",
-            line=dict(color="#002060", width=2.5)
-        ))
-        
-        # Realizado
-        fig.add_trace(go.Scatter(
-            x=months_names_pt,
-            y=real_MoM,
-            name="Realizado",
-            line=dict(color="#166534", width=2.5),
-            connectgaps=False
-        ))
-        
-        # Visually highlight selected month with a large marker
-        selected_month_idx = EN_MONTHS.index(month_sel_en)
-        selected_month_name = PT_MONTHS[selected_month_idx]
-        selected_month_val = real_MoM[selected_month_idx] if real_MoM[selected_month_idx] is not None else plan_MoM[selected_month_idx]
-        
-        fig.add_trace(go.Scatter(
-            x=[selected_month_name],
-            y=[selected_month_val],
-            name="Mês Selecionado",
-            marker=dict(color="#D97706", size=11, line=dict(color="#FFFFFF", width=2)),
-            showlegend=True
-        ))
-        
+        if "YTD" in viz_mode:
+            plan_MoM = []
+            real_MoM = []
+            
+            for m in EN_MONTHS:
+                if m in m_map_proj:
+                    cl_plan = sum(data_loader.clean_val(monthly_data[c][q_key]["plan"][m]) for c in filtered_clients)
+                    cl_real = sum(data_loader.clean_val(monthly_data[c][q_key]["real"][m]) for c in filtered_clients)
+                    
+                    if quad["is_ticket"]:
+                        g_plan = sum(data_loader.clean_val(monthly_data[c]["GMV"]["plan"][m]) for c in filtered_clients)
+                        p_plan = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["plan"][m]) for c in filtered_clients)
+                        cl_plan = g_plan / p_plan if p_plan > 0 else 0.0
+                        
+                        g_real = sum(data_loader.clean_val(monthly_data[c]["GMV"]["real"][m]) for c in filtered_clients)
+                        p_real = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["real"][m]) for c in filtered_clients)
+                        cl_real = g_real / p_real if p_real > 0 else 0.0
+                else:
+                    cl_plan = 0.0
+                    cl_real = 0.0
+                    
+                plan_MoM.append(cl_plan)
+                if cl_real > 0 or m == month_sel_en:
+                    real_MoM.append(cl_real)
+                else:
+                    real_MoM.append(None)
+                    
+            fig.add_trace(go.Scatter(
+                x=PT_MONTHS, y=plan_MoM, name="Planejado", line=dict(color="#002060", width=2.5)
+            ))
+            fig.add_trace(go.Scatter(
+                x=PT_MONTHS, y=real_MoM, name="Realizado", line=dict(color="#166534", width=2.5), connectgaps=False
+            ))
+            
+            sel_idx = EN_MONTHS.index(month_sel_en)
+            sel_val = real_MoM[sel_idx] if real_MoM[sel_idx] is not None else plan_MoM[sel_idx]
+            fig.add_trace(go.Scatter(
+                x=[PT_MONTHS[sel_idx]], y=[sel_val], name="Mês Selecionado",
+                marker=dict(color="#D97706", size=10, line=dict(color="#FFFFFF", width=2))
+            ))
+        else:
+            plan_W = []
+            real_W = []
+            
+            month_plan_tot = sum(data_loader.clean_val(weekly_data[c][q_key]["plan"][month_sel_en]) for c in filtered_clients)
+            
+            for w in range(num_weeks):
+                w_plan = month_plan_tot * weekly_weights[w]
+                w_real = 0.0
+                
+                for c in filtered_clients:
+                    if quad["is_ticket"]:
+                        w_gmv = data_loader.clean_val(weekly_data[c]["GMV"]["weekly"][month_sel_en][w])
+                        w_ped = data_loader.clean_val(weekly_data[c]["Pedidos"]["weekly"][month_sel_en][w])
+                        w_real += w_gmv / w_ped if w_ped > 0 else 0.0
+                    else:
+                        w_real += data_loader.clean_val(weekly_data[c][q_key]["weekly"][month_sel_en][w])
+                        
+                plan_W.append(w_plan)
+                if w <= selected_week_idx:
+                    if "MTD" in viz_mode:
+                        if quad["is_ticket"]:
+                            cum_gmv = sum(data_loader.clean_val(weekly_data[c]["GMV"]["weekly"][month_sel_en][i]) for c in filtered_clients for i in range(w+1))
+                            cum_ped = sum(data_loader.clean_val(weekly_data[c]["Pedidos"]["weekly"][month_sel_en][i]) for c in filtered_clients for i in range(w+1))
+                            cum_real = cum_gmv / cum_ped if cum_ped > 0 else 0.0
+                        else:
+                            cum_real = sum(data_loader.clean_val(weekly_data[c][q_key]["weekly"][month_sel_en][i]) for c in filtered_clients for i in range(w+1))
+                        real_W.append(cum_real)
+                    else:
+                        real_W.append(w_real)
+                else:
+                    real_W.append(None)
+                    
+            if "MTD" in viz_mode:
+                plan_cum = []
+                acc = 0.0
+                for val in plan_W:
+                    acc += val
+                    plan_cum.append(acc)
+                plan_W = plan_cum
+                
+            fig.add_trace(go.Scatter(
+                x=week_options, y=plan_W, name="Planejado", line=dict(color="#002060", width=2.5)
+            ))
+            fig.add_trace(go.Scatter(
+                x=week_options, y=real_W, name="Realizado", line=dict(color="#166534", width=2.5), connectgaps=False
+            ))
+            
+            sel_val = real_W[selected_week_idx] if real_W[selected_week_idx] is not None else plan_W[selected_week_idx]
+            fig.add_trace(go.Scatter(
+                x=[week_options[selected_week_idx]], y=[sel_val], name="Semana Selecionada",
+                marker=dict(color="#D97706", size=10, line=dict(color="#FFFFFF", width=2))
+            ))
+            
         fig.update_layout(
-            height=200,
+            height=320,
             margin=dict(l=10, r=10, t=10, b=10),
             showlegend=True,
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
@@ -862,10 +900,30 @@ for m_info in metrics_setup:
             yaxis=dict(showgrid=True, gridcolor="#F1F5F9")
         )
         
-        st.markdown(f'''
-        <div class="cockpit-card">
-            <div class="card-title">Evolução Mensal 2026 (Consolidado)</div>
-        ''', unsafe_allow_html=True)
         st.plotly_chart(fig, use_container_width=True)
+        st.markdown('<div style="height:15px;"></div>', unsafe_allow_html=True)
+        
+        # CHALLENGE TO TARGET CARD
+        st.markdown(f'''
+        <div class="kpi-card" style="border: 1px solid #E2E8F0; padding:1rem; background-color:#FFFFFF;">
+            <div style="font-size:0.8rem; font-weight:700; color:#64748B; letter-spacing:0.5px; text-transform:uppercase;">
+                DESAFIO PARA A META ({"ANUAL" if "YTD" in viz_mode else "MENSAL"})
+            </div>
+            <div style="font-size:1.15rem; font-weight:800; color:{challenge_color}; margin-top:0.4rem; margin-bottom:0.75rem;">
+                {challenge_status} {challenge_msg}
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+                <div>
+                    <div class="kpi-sub-label">Semanas Restantes</div>
+                    <div class="kpi-sub-val" style="font-size:1.1rem;">{rem_weeks}</div>
+                </div>
+                <div>
+                    <div class="kpi-sub-label">Necessidade Semanal Restante</div>
+                    <div class="kpi-sub-val" style="font-size:1.1rem; color:{challenge_color};">{req_avg_str}</div>
+                </div>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
         st.markdown('</div>', unsafe_allow_html=True)
-        st.markdown('<br><br>', unsafe_allow_html=True)
+        st.markdown('<div style="height:20px;"></div>', unsafe_allow_html=True)
