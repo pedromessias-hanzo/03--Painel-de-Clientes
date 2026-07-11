@@ -474,6 +474,90 @@ kpis_values = {
     "Ticket Médio": {"actual": tkt_act, "plan": tkt_pla, "proj": tkt_prj}
 }
 
+# Precompute rankings for all metrics to be used globally
+rankings_by_metric = {}
+for m_name in ["GMV", "Receita Hanzo", "Pedidos", "Ticket Médio"]:
+    client_list_temp = []
+    has_lvl_temp = True
+    
+    if "Ano" in viz_mode:
+        total_ytd_real = sum(data_loader.clean_val(monthly_data[c][m_name]["real"][m]) for c in filtered_clients for m in months_up_to)
+        if total_ytd_real == 0:
+            has_lvl_temp = False
+        else:
+            for client in filtered_clients:
+                curr_val = sum(data_loader.clean_val(monthly_data[client][m_name]["real"][m]) for m in months_up_to)
+                accum_val = sum(data_loader.clean_val(monthly_data[client][m_name]["plan"][m]) for m in months_up_to)
+                orders_count = sum(data_loader.clean_val(monthly_data[client]["Pedidos"]["real"][m]) for m in months_up_to)
+                
+                if m_name == "Ticket Médio":
+                    acc_gmv = sum(data_loader.clean_val(monthly_data[client]["GMV"]["real"][m]) for m in months_up_to)
+                    curr_val = acc_gmv / orders_count if orders_count > 0 else 0.0
+                    acc_gmv_plan = sum(data_loader.clean_val(monthly_data[client]["GMV"]["plan"][m]) for m in months_up_to)
+                    acc_ped_plan = sum(data_loader.clean_val(monthly_data[client]["Pedidos"]["plan"][m]) for m in months_up_to)
+                    accum_val = acc_gmv_plan / acc_ped_plan if acc_ped_plan > 0 else 0.0
+                    
+                client_list_temp.append({"client": client, "curr": curr_val, "accum": accum_val, "orders": orders_count})
+    else:
+        if not has_weeks_data:
+            total_real_month = sum(data_loader.clean_val(monthly_data[c][m_name]["real"][month_sel_en]) for c in filtered_clients)
+            if total_real_month == 0:
+                has_lvl_temp = False
+            else:
+                for client in filtered_clients:
+                    curr_val = data_loader.clean_val(monthly_data[client][m_name]["real"][month_sel_en])
+                    accum_val = data_loader.clean_val(monthly_data[client][m_name]["plan"][month_sel_en])
+                    orders_count = data_loader.clean_val(monthly_data[client]["Pedidos"]["real"][month_sel_en])
+                    
+                    if m_name == "Ticket Médio":
+                        acc_gmv = data_loader.clean_val(monthly_data[client]["GMV"]["real"][month_sel_en])
+                        curr_val = acc_gmv / orders_count if orders_count > 0 else 0.0
+                        acc_gmv_plan = data_loader.clean_val(monthly_data[client]["GMV"]["plan"][month_sel_en])
+                        acc_ped_plan = data_loader.clean_val(monthly_data[client]["Pedidos"]["plan"][month_sel_en])
+                        accum_val = acc_gmv_plan / acc_ped_plan if acc_ped_plan > 0 else 0.0
+                        
+                    client_list_temp.append({"client": client, "curr": curr_val, "accum": accum_val, "orders": orders_count})
+        else:
+            for client in filtered_clients:
+                orders_count = 0
+                if "Semana" in viz_mode:
+                    curr_val = data_loader.clean_val(weekly_data[client][m_name]["weekly"][month_sel_en][selected_week_idx])
+                    accum_val = sum(data_loader.clean_val(weekly_data[client][m_name]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
+                    orders_count = data_loader.clean_val(weekly_data[client]["Pedidos"]["weekly"][month_sel_en][selected_week_idx])
+                    
+                    if m_name == "Ticket Médio":
+                        wk_gmv = data_loader.clean_val(weekly_data[client]["GMV"]["weekly"][month_sel_en][selected_week_idx])
+                        curr_val = wk_gmv / orders_count if orders_count > 0 else 0.0
+                        acc_gmv_wk = sum(data_loader.clean_val(weekly_data[client]["GMV"]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
+                        acc_ped_wk = sum(data_loader.clean_val(weekly_data[client]["Pedidos"]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
+                        accum_val = acc_gmv_wk / acc_ped_wk if acc_ped_wk > 0 else 0.0
+                else:
+                    curr_val = sum(data_loader.clean_val(weekly_data[client][m_name]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
+                    accum_val = sum(data_loader.clean_val(monthly_data[client][m_name]["real"][m]) for m in months_up_to)
+                    orders_count = sum(data_loader.clean_val(weekly_data[client]["Pedidos"]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
+                    
+                    if m_name == "Ticket Médio":
+                        acc_gmv_wk = sum(data_loader.clean_val(weekly_data[client]["GMV"]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
+                        curr_val = acc_gmv_wk / orders_count if orders_count > 0 else 0.0
+                        ytd_gmv = sum(data_loader.clean_val(monthly_data[client]["GMV"]["real"][m]) for m in months_up_to)
+                        ytd_ped = sum(data_loader.clean_val(monthly_data[client]["Pedidos"]["real"][m]) for m in months_up_to)
+                        accum_val = ytd_gmv / ytd_ped if ytd_ped > 0 else 0.0
+                        
+                client_list_temp.append({"client": client, "curr": curr_val, "accum": accum_val, "orders": orders_count})
+                
+    group_curr_total = sum(c["curr"] for c in client_list_temp)
+    sorted_top_temp = sorted(client_list_temp, key=lambda x: (-x["curr"], x["client"]))
+    
+    filtered_bottom_temp = [r for r in client_list_temp if r["curr"] > 0 and r["accum"] > 0 and r["client"].strip() != ""]
+    sorted_bottom_temp = sorted(filtered_bottom_temp, key=lambda x: (x["curr"], x["client"]))
+    
+    rankings_by_metric[m_name] = {
+        "has_data": has_lvl_temp,
+        "sorted_top": sorted_top_temp,
+        "sorted_bottom": sorted_bottom_temp,
+        "group_curr_total": group_curr_total
+    }
+
 # Calculate overall status badge based on achievements
 kpi_achievements = []
 for k, v in kpis_values.items():
@@ -603,7 +687,7 @@ st.markdown('<br>', unsafe_allow_html=True)
 # New Section: Evolução dos Indicadores — Planejado, Real e Projeção
 st.markdown('<div class="quadrant-title" style="margin-top:0.5rem; margin-bottom:1rem;">Evolução dos Indicadores — Planejado, Real e Projeção</div>', unsafe_allow_html=True)
 
-col_chart_sel, _ = st.columns([2.5, 5.5])
+col_chart_sel, col_client_sel = st.columns([1, 1])
 with col_chart_sel:
     sel_indicator = st.selectbox(
         "Indicador em análise",
@@ -622,12 +706,45 @@ chart_metric_key = ind_key_map[sel_indicator]
 chart_fmt = fmt_qty if sel_indicator == "Pedidos" else fmt_currency
 short_label = {"GMV": "GMV", "Receita Hanzo": "Receita", "Pedidos": "Pedidos", "Ticket Médio": "Ticket Médio"}[chart_metric_key]
 
+# Determine dynamic client options
+current_rank_info = rankings_by_metric[chart_metric_key]
+top_5_clients = [row["client"] for row in current_rank_info["sorted_top"][:5]] if current_rank_info["has_data"] else []
+bot_5_clients = [row["client"] for row in current_rank_info["sorted_bottom"][:5]] if current_rank_info["has_data"] else []
+
+# Union of Top 5 and Bottom 5 clients present in the period
+union_clients = sorted(list(set(top_5_clients + bot_5_clients)))
+
+client_options = ["Todos", "Top 5 Clientes", "Bottom 5 Clientes"] + union_clients
+
+with col_client_sel:
+    sel_client = st.selectbox(
+        "Cliente",
+        client_options,
+        key="sel_client_evolution_chart"
+    )
+
+# Stable deterministic client color mapping
+import hashlib
+def get_client_color(client_name):
+    palette = [
+        '#1f77b4', '#2ca02c', '#ff7f0e', '#9467bd', '#d62728',
+        '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
+        '#0D9488', '#2563EB', '#4F46E5', '#7C3AED', '#DB2777',
+        '#EA580C', '#65A30D', '#16A34A', '#0284C7', '#475569',
+        '#F59E0B', '#10B981', '#EC4899', '#8B5CF6'
+    ]
+    val = int(hashlib.md5(client_name.encode('utf-8')).hexdigest(), 16)
+    h = val % len(palette)
+    return palette[h]
+
 # Helper to calculate Planejado, Real and Projeção pelo Ritmo Atual series dynamically
-def get_indicator_series(metric):
+def get_indicator_series(metric, target_client=None):
     x_lbls = []
     y_p = []
     y_r = []
     y_pr = []
+    
+    clients_to_sum = [target_client] if target_client is not None else filtered_clients
     
     if has_weeks_data and "Ano" not in viz_mode:
         # Weekly view: "Semana Selecionada" or "Acumulado no Mês"
@@ -644,12 +761,12 @@ def get_indicator_series(metric):
         else:
             w_weights = [w / sum_w for w in w_weights]
             
-        m_plan_val = sum(data_loader.clean_val(monthly_data[c][metric]["plan"][month_sel_en]) for c in filtered_clients)
+        m_plan_val = sum(data_loader.clean_val(monthly_data[c][metric]["plan"][month_sel_en]) for c in clients_to_sum)
         
         # Real weekly values
         r_vals_all = []
         for w in range(num_w):
-            w_real_val = sum(data_loader.clean_val(weekly_data[c][metric]["weekly"][month_sel_en][w]) for c in filtered_clients)
+            w_real_val = sum(data_loader.clean_val(weekly_data[c][metric]["weekly"][month_sel_en][w]) for c in clients_to_sum)
             r_vals_all.append(w_real_val)
             
         if "Semana" in viz_mode:
@@ -695,8 +812,8 @@ def get_indicator_series(metric):
         x_lbls = PT_MONTHS
         sel_i = EN_MONTHS.index(month_sel_en)
         
-        m_plan_vals = [sum(data_loader.clean_val(monthly_data[c][metric]["plan"][m]) for c in filtered_clients) for m in EN_MONTHS]
-        m_real_vals = [sum(data_loader.clean_val(monthly_data[c][metric]["real"][m]) for c in filtered_clients) for m in EN_MONTHS]
+        m_plan_vals = [sum(data_loader.clean_val(monthly_data[c][metric]["plan"][m]) for c in clients_to_sum) for m in EN_MONTHS]
+        m_real_vals = [sum(data_loader.clean_val(monthly_data[c][metric]["real"][m]) for c in clients_to_sum) for m in EN_MONTHS]
         
         if "Ano" in viz_mode:
             # YTD accumulated monthly series
@@ -737,16 +854,16 @@ def get_indicator_series(metric):
                     
     return x_lbls, y_p, y_r, y_pr
 
-# Compute the actual indicator series
+# Get Total/Reference series
 if chart_metric_key == "Ticket Médio":
-    x_labels, y_plan_gmv, y_real_gmv, y_proj_gmv = get_indicator_series("GMV")
-    _, y_plan_ped, y_real_ped, y_proj_ped = get_indicator_series("Pedidos")
+    x_labels, y_plan_total_gmv, y_real_total_gmv, y_proj_total_gmv = get_indicator_series("GMV")
+    _, y_plan_total_ped, y_real_total_ped, y_proj_total_ped = get_indicator_series("Pedidos")
     
-    y_plan = [y_plan_gmv[i] / y_plan_ped[i] if y_plan_ped[i] > 0 else 0.0 for i in range(len(x_labels))]
-    y_real = [y_real_gmv[i] / y_real_ped[i] if y_real_ped[i] is not None and y_real_ped[i] > 0 else None for i in range(len(x_labels))]
-    y_proj = [y_proj_gmv[i] / y_proj_ped[i] if y_proj_ped[i] is not None and y_proj_ped[i] > 0 else None for i in range(len(x_labels))]
+    y_plan_total = [y_plan_total_gmv[i] / y_plan_total_ped[i] if y_plan_total_ped[i] > 0 else 0.0 for i in range(len(x_labels))]
+    y_real_total = [y_real_total_gmv[i] / y_real_total_ped[i] if y_real_total_ped[i] is not None and y_real_total_ped[i] > 0 else None for i in range(len(x_labels))]
+    y_proj_total = [y_proj_total_gmv[i] / y_proj_total_ped[i] if y_proj_total_ped[i] is not None and y_proj_total_ped[i] > 0 else None for i in range(len(x_labels))]
 else:
-    x_labels, y_plan, y_real, y_proj = get_indicator_series(chart_metric_key)
+    x_labels, y_plan_total, y_real_total, y_proj_total = get_indicator_series(chart_metric_key)
 
 # Identify index coordinates
 if has_weeks_data and "Ano" not in viz_mode:
@@ -754,188 +871,293 @@ if has_weeks_data and "Ano" not in viz_mode:
 else:
     selected_idx = EN_MONTHS.index(month_sel_en)
 
-# Calculate indicators for status annotations
-plan_real_last = y_plan[selected_idx]
-real_last = y_real[selected_idx] if y_real[selected_idx] is not None else 0.0
-
-plan_proj_last = y_plan[-1]
-proj_last = y_proj[-1] if y_proj[-1] is not None else 0.0
-
-# Annotation labels and colors
-if plan_real_last == 0:
-    real_gap_val = 0.0
-    real_farol = "⚪"
-    real_color = "#64748B"
-    real_status_label = "Real x Planejado: - % ⚪"
-else:
-    real_ratio = real_last / plan_real_last
-    real_gap_val = ((real_last - plan_real_last) / plan_real_last) * 100
-    if real_ratio >= 1.0:
-        real_farol = "🟢"
-        real_color = "#166534"
-    elif real_ratio >= 0.90:
-        real_farol = "🟡"
-        real_color = "#854D0E"
-    else:
-        real_farol = "🔴"
-        real_color = "#991B1B"
-    real_status_label = f"Real x Planejado: {real_gap_val:+.1f}% {real_farol}".replace(".", ",")
-
-if plan_proj_last == 0:
-    proj_gap_val = 0.0
-    proj_farol = "⚪"
-    proj_status_label = "Projeção x Planejado: - % ⚪"
-else:
-    proj_ratio = proj_last / plan_proj_last
-    proj_gap_val = ((proj_last - plan_proj_last) / plan_proj_last) * 100
-    if proj_ratio >= 1.0:
-        proj_farol = "🟢"
-    elif proj_ratio >= 0.90:
-        proj_farol = "🟡"
-    else:
-        proj_farol = "🔴"
-    proj_status_label = f"Projeção x Planejado: {proj_gap_val:+.1f}% {proj_farol}".replace(".", ",")
-
-# Compute shaded desvio areas
-# A) Real area: from start up to selected_idx
-valid_x = x_labels[:selected_idx+1]
-valid_plan = y_plan[:selected_idx+1]
-valid_real = [v if v is not None else 0.0 for v in y_real[:selected_idx+1]]
-
-fill_x_real = valid_x + valid_x[::-1]
-fill_y_real = valid_plan + valid_real[::-1]
-
-if plan_real_last == 0:
-    fill_color_real = 'rgba(100,116,139,0.04)'
-else:
-    fill_color_real = 'rgba(22, 101, 52, 0.08)' if real_last >= plan_real_last else 'rgba(153, 27, 27, 0.08)'
-
-# B) Projeção area: from selected_idx to end
-valid_proj_x = x_labels[selected_idx:]
-valid_proj_plan = y_plan[selected_idx:]
-valid_proj_val = [v if v is not None else 0.0 for v in y_proj[selected_idx:]]
-
-fill_x_proj = valid_proj_x + valid_proj_x[::-1]
-fill_y_proj = valid_proj_plan + valid_proj_val[::-1]
-
-if plan_proj_last == 0:
-    fill_color_proj = 'rgba(100,116,139,0.02)'
-else:
-    fill_color_proj = 'rgba(22, 101, 52, 0.04)' if proj_last >= plan_proj_last else 'rgba(153, 27, 27, 0.04)'
-
 # Plotly Line Chart
 fig_ind = go.Figure()
 
-# Add Shaded Areas in the background
-fig_ind.add_trace(go.Scatter(
-    x=fill_x_real, y=fill_y_real,
-    fill='toself',
-    fillcolor=fill_color_real,
-    line=dict(color='rgba(0,0,0,0)'),
-    showlegend=False,
-    hoverinfo='skip'
-))
+if sel_client == "Todos" or sel_client not in ["Top 5 Clientes", "Bottom 5 Clientes"]:
+    # Single entity view: either Total or specific client
+    if sel_client == "Todos":
+        y_plan = y_plan_total
+        y_real = y_real_total
+        y_proj = y_proj_total
+    else:
+        # Specific client series
+        if chart_metric_key == "Ticket Médio":
+            _, y_plan_c_gmv, y_real_c_gmv, y_proj_c_gmv = get_indicator_series("GMV", target_client=sel_client)
+            _, y_plan_c_ped, y_real_c_ped, y_proj_c_ped = get_indicator_series("Pedidos", target_client=sel_client)
+            
+            y_plan = [y_plan_c_gmv[i] / y_plan_c_ped[i] if y_plan_c_ped[i] > 0 else 0.0 for i in range(len(x_labels))]
+            y_real = [y_real_c_gmv[i] / y_real_c_ped[i] if y_real_c_ped[i] is not None and y_real_c_ped[i] > 0 else None for i in range(len(x_labels))]
+            y_proj = [y_proj_c_gmv[i] / y_proj_c_ped[i] if y_proj_c_ped[i] is not None and y_proj_c_ped[i] > 0 else None for i in range(len(x_labels))]
+        else:
+            _, y_plan, y_real, y_proj = get_indicator_series(chart_metric_key, target_client=sel_client)
 
-fig_ind.add_trace(go.Scatter(
-    x=fill_x_proj, y=fill_y_proj,
-    fill='toself',
-    fillcolor=fill_color_proj,
-    line=dict(color='rgba(0,0,0,0)'),
-    showlegend=False,
-    hoverinfo='skip'
-))
+    plan_real_last = y_plan[selected_idx]
+    real_last = y_real[selected_idx] if y_real[selected_idx] is not None else 0.0
 
-# Generate custom tooltips for the lines
-tooltip_texts = []
-for i, lbl in enumerate(x_labels):
-    p_val = y_plan[i]
-    r_val = y_real[i]
-    pr_val = y_proj[i]
-    
-    r_str = chart_fmt(r_val) if r_val is not None else "—"
-    pr_str = chart_fmt(pr_val) if pr_val is not None else "—"
-    
-    r_pct_str = "—"
-    r_f = ""
-    if r_val is not None:
-        r_pct = ((r_val - p_val)/p_val)*100 if p_val > 0 else 0.0
-        r_pct_str = f"{r_pct:+.1f}%".replace(".", ",")
-        r_f = "🟢" if p_val == 0 or (r_val/p_val) >= 1.0 else "🟡" if (r_val/p_val) >= 0.90 else "🔴"
+    plan_proj_last = y_plan[-1]
+    proj_last = y_proj[-1] if y_proj[-1] is not None else 0.0
+
+    # Annotation labels and colors
+    if plan_real_last == 0:
+        real_gap_val = 0.0
+        real_farol = "⚪"
+        real_color = "#64748B"
+        real_status_label = "Real x Planejado: - % ⚪"
+    else:
+        real_ratio = real_last / plan_real_last
+        real_gap_val = ((real_last - plan_real_last) / plan_real_last) * 100
+        if real_ratio >= 1.0:
+            real_farol = "🟢"
+            real_color = "#166534"
+        elif real_ratio >= 0.90:
+            real_farol = "🟡"
+            real_color = "#854D0E"
+        else:
+            real_farol = "🔴"
+            real_color = "#991B1B"
+        real_status_label = f"Real x Planejado: {real_gap_val:+.1f}% {real_farol}".replace(".", ",")
+
+    if plan_proj_last == 0:
+        proj_gap_val = 0.0
+        proj_farol = "⚪"
+        proj_status_label = "Projeção x Planejado: - % ⚪"
+    else:
+        proj_ratio = proj_last / plan_proj_last
+        proj_gap_val = ((proj_last - plan_proj_last) / plan_proj_last) * 100
+        if proj_ratio >= 1.0:
+            proj_farol = "🟢"
+        elif proj_ratio >= 0.90:
+            proj_farol = "🟡"
+        else:
+            proj_farol = "🔴"
+        proj_status_label = f"Projeção x Planejado: {proj_gap_val:+.1f}% {proj_farol}".replace(".", ",")
+
+    # Compute shaded desvio areas
+    valid_x = x_labels[:selected_idx+1]
+    valid_plan = y_plan[:selected_idx+1]
+    valid_real = [v if v is not None else 0.0 for v in y_real[:selected_idx+1]]
+
+    fill_x_real = valid_x + valid_x[::-1]
+    fill_y_real = valid_plan + valid_real[::-1]
+
+    if plan_real_last == 0:
+        fill_color_real = 'rgba(100,116,139,0.04)'
+    else:
+        fill_color_real = 'rgba(22, 101, 52, 0.08)' if real_last >= plan_real_last else 'rgba(153, 27, 27, 0.08)'
+
+    valid_proj_x = x_labels[selected_idx:]
+    valid_proj_plan = y_plan[selected_idx:]
+    valid_proj_val = [v if v is not None else 0.0 for v in y_proj[selected_idx:]]
+
+    fill_x_proj = valid_proj_x + valid_proj_x[::-1]
+    fill_y_proj = valid_proj_plan + valid_proj_val[::-1]
+
+    if plan_proj_last == 0:
+        fill_color_proj = 'rgba(100,116,139,0.02)'
+    else:
+        fill_color_proj = 'rgba(22, 101, 52, 0.04)' if proj_last >= plan_proj_last else 'rgba(153, 27, 27, 0.04)'
+
+    # Add Shaded Areas
+    fig_ind.add_trace(go.Scatter(
+        x=fill_x_real, y=fill_y_real,
+        fill='toself',
+        fillcolor=fill_color_real,
+        line=dict(color='rgba(0,0,0,0)'),
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+
+    fig_ind.add_trace(go.Scatter(
+        x=fill_x_proj, y=fill_y_proj,
+        fill='toself',
+        fillcolor=fill_color_proj,
+        line=dict(color='rgba(0,0,0,0)'),
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+
+    # Generate custom tooltips
+    tooltip_texts = []
+    for i, lbl in enumerate(x_labels):
+        p_val = y_plan[i]
+        r_val = y_real[i]
+        pr_val = y_proj[i]
         
-    pr_pct_str = "—"
-    pr_f = ""
-    if pr_val is not None:
-        pr_pct = ((pr_val - p_val)/p_val)*100 if p_val > 0 else 0.0
-        pr_pct_str = f"{pr_pct:+.1f}%".replace(".", ",")
-        pr_f = "🟢" if p_val == 0 or (pr_val/p_val) >= 1.0 else "🟡" if (pr_val/p_val) >= 0.90 else "🔴"
+        r_str = chart_fmt(r_val) if r_val is not None else "—"
+        pr_str = chart_fmt(pr_val) if pr_val is not None else "—"
         
-    tooltip_texts.append(
-        f"Indicador: {sel_indicator}<br>"
-        f"Período: {lbl}<br>"
-        f"Planejado: {chart_fmt(p_val)}<br>"
-        f"Real: {r_str}<br>"
-        f"Projeção: {pr_str}<br>"
-        f"Real x Planejado: {r_pct_str} {r_f}<br>"
-        f"Projeção x Planejado: {pr_pct_str} {pr_f}"
+        r_pct_str = "—"
+        r_f = ""
+        if r_val is not None:
+            r_pct = ((r_val - p_val)/p_val)*100 if p_val > 0 else 0.0
+            r_pct_str = f"{r_pct:+.1f}%".replace(".", ",")
+            r_f = "🟢" if p_val == 0 or (r_val/p_val) >= 1.0 else "🟡" if (r_val/p_val) >= 0.90 else "🔴"
+            
+        pr_pct_str = "—"
+        pr_f = ""
+        if pr_val is not None:
+            pr_pct = ((pr_val - p_val)/p_val)*100 if p_val > 0 else 0.0
+            pr_pct_str = f"{pr_pct:+.1f}%".replace(".", ",")
+            pr_f = "🟢" if p_val == 0 or (pr_val/p_val) >= 1.0 else "🟡" if (pr_val/p_val) >= 0.90 else "🔴"
+            
+        # Get share for client
+        share_line = ""
+        if sel_client != "Todos" and r_val is not None:
+            tot_real = y_real_total[i]
+            share_val = (r_val / tot_real)*100 if tot_real > 0 else 0.0
+            share_line = f"Participação: {share_val:.1f}%<br>"
+            
+        tooltip_texts.append(
+            f"Cliente: {sel_client}<br>"
+            f"Período: {lbl}<br>"
+            f"Planejado: {chart_fmt(p_val)}<br>"
+            f"Real: {r_str}<br>"
+            f"Projeção: {pr_str}<br>"
+            f"{share_line}"
+            f"Real x Planejado: {r_pct_str} {r_f}<br>"
+            f"Projeção x Planejado: {pr_pct_str} {pr_f}"
+        )
+
+    # Add Lines
+    fig_ind.add_trace(go.Scatter(
+        x=x_labels, y=y_plan,
+        name=f"Planejado ({sel_client})" if sel_client != "Todos" else "Planejado",
+        mode='lines+markers',
+        line=dict(color='#002060', width=3),
+        text=tooltip_texts,
+        hovertemplate="%{text}<extra></extra>"
+    ))
+
+    fig_ind.add_trace(go.Scatter(
+        x=x_labels, y=y_real,
+        name=f"Real ({sel_client})" if sel_client != "Todos" else "Real",
+        mode='lines+markers',
+        line=dict(color=real_color, width=3),
+        text=tooltip_texts,
+        hovertemplate="%{text}<extra></extra>"
+    ))
+
+    fig_ind.add_trace(go.Scatter(
+        x=x_labels, y=y_proj,
+        name=f"Projeção ({sel_client})" if sel_client != "Todos" else "Projeção pelo Ritmo Atual",
+        mode='lines+markers',
+        line=dict(color='#D97706', width=3, dash='dash'),
+        text=tooltip_texts,
+        hovertemplate="%{text}<extra></extra>"
+    ))
+
+    # Add Status Annotations
+    fig_ind.add_annotation(
+        x=x_labels[selected_idx], y=real_last,
+        text=real_status_label,
+        showarrow=True,
+        arrowhead=1,
+        ax=65, ay=-35,
+        font=dict(size=11, color=real_color, family="sans-serif"),
+        bgcolor="rgba(255,255,255,0.95)",
+        bordercolor=real_color,
+        borderwidth=1,
+        borderpad=4
     )
 
-# Add Lines
-fig_ind.add_trace(go.Scatter(
-    x=x_labels, y=y_plan,
-    name="Planejado",
-    mode='lines+markers',
-    line=dict(color='#002060', width=3),
-    text=tooltip_texts,
-    hovertemplate="%{text}<extra></extra>"
-))
+    fig_ind.add_annotation(
+        x=x_labels[-1], y=proj_last,
+        text=proj_status_label,
+        showarrow=True,
+        arrowhead=1,
+        ax=65, ay=35,
+        font=dict(size=11, color='#D97706', family="sans-serif"),
+        bgcolor="rgba(255,255,255,0.95)",
+        bordercolor='#D97706',
+        borderwidth=1,
+        borderpad=4
+    )
 
-fig_ind.add_trace(go.Scatter(
-    x=x_labels, y=y_real,
-    name="Real",
-    mode='lines+markers',
-    line=dict(color=real_color, width=3),
-    text=tooltip_texts,
-    hovertemplate="%{text}<extra></extra>"
-))
+else:
+    # Top 5 Clientes or Bottom 5 Clientes multi-line view
+    # 1. Total Reference Lines
+    fig_ind.add_trace(go.Scatter(
+        x=x_labels, y=y_plan_total,
+        name="Planejado (Total)",
+        mode='lines',
+        line=dict(color='#002060', width=2),
+        hoverinfo='skip'
+    ))
 
-fig_ind.add_trace(go.Scatter(
-    x=x_labels, y=y_proj,
-    name="Projeção pelo Ritmo Atual",
-    mode='lines+markers',
-    line=dict(color='#D97706', width=3, dash='dash'),
-    text=tooltip_texts,
-    hovertemplate="%{text}<extra></extra>"
-))
+    fig_ind.add_trace(go.Scatter(
+        x=x_labels, y=y_proj_total,
+        name="Projeção (Total)",
+        mode='lines',
+        line=dict(color='#D97706', width=2, dash='dash'),
+        hoverinfo='skip'
+    ))
 
-# Status annotations pointing to the respective points
-fig_ind.add_annotation(
-    x=x_labels[selected_idx], y=real_last,
-    text=real_status_label,
-    showarrow=True,
-    arrowhead=1,
-    ax=65, ay=-35,
-    font=dict(size=11, color=real_color, family="sans-serif"),
-    bgcolor="rgba(255,255,255,0.95)",
-    bordercolor=real_color,
-    borderwidth=1,
-    borderpad=4
-)
+    # 2. Individual Client Real lines
+    clients_to_plot = top_5_clients if sel_client == "Top 5 Clientes" else bot_5_clients
+    for client in clients_to_plot:
+        if chart_metric_key == "Ticket Médio":
+            _, _, y_real_c_gmv, _ = get_indicator_series("GMV", target_client=client)
+            _, _, y_real_c_ped, _ = get_indicator_series("Pedidos", target_client=client)
+            y_real_c = [y_real_c_gmv[i] / y_real_c_ped[i] if y_real_c_ped[i] is not None and y_real_c_ped[i] > 0 else None for i in range(len(x_labels))]
+        else:
+            _, _, y_real_c, _ = get_indicator_series(chart_metric_key, target_client=client)
 
-fig_ind.add_annotation(
-    x=x_labels[-1], y=proj_last,
-    text=proj_status_label,
-    showarrow=True,
-    arrowhead=1,
-    ax=65, ay=35,
-    font=dict(size=11, color='#D97706', family="sans-serif"),
-    bgcolor="rgba(255,255,255,0.95)",
-    bordercolor='#D97706',
-    borderwidth=1,
-    borderpad=4
-)
+        c_tooltips = []
+        for idx_lbl, lbl in enumerate(x_labels):
+            val_c = y_real_c[idx_lbl]
+            if val_c is None:
+                c_tooltips.append("")
+                continue
 
-# Dynamic axis scale range calculation
-all_visible_vals = [v for v in y_plan + [x for x in y_real if x is not None] + [x for x in y_proj if x is not None]]
+            tot_real = y_real_total[idx_lbl]
+            share_val = (val_c / tot_real)*100 if tot_real > 0 else 0.0
+
+            if chart_metric_key == "Ticket Médio":
+                _, y_plan_c_gmv, _, _ = get_indicator_series("GMV", target_client=client)
+                _, y_plan_c_ped, _, _ = get_indicator_series("Pedidos", target_client=client)
+                plan_c = y_plan_c_gmv[idx_lbl] / y_plan_c_ped[idx_lbl] if y_plan_c_ped[idx_lbl] > 0 else 0.0
+            else:
+                _, y_plan_c, _, _ = get_indicator_series(chart_metric_key, target_client=client)
+                plan_c = y_plan_c[idx_lbl]
+
+            desv_val = ((val_c - plan_c)/plan_c)*100 if plan_c > 0 else 0.0
+            desv_farol = "🟢" if plan_c == 0 or (val_c/plan_c) >= 1.0 else "🟡" if (val_c/plan_c) >= 0.90 else "🔴"
+
+            c_tooltips.append(
+                f"Cliente: {client}<br>"
+                f"Período: {lbl}<br>"
+                f"Valor: {chart_fmt(val_c)}<br>"
+                f"Participação: {share_val:.1f}%<br>"
+                f"Desvio x Planejado: {desv_val:+.1f}% {desv_farol}"
+            )
+
+        fig_ind.add_trace(go.Scatter(
+            x=x_labels, y=y_real_c,
+            name=client,
+            mode='lines+markers',
+            line=dict(color=get_client_color(client), width=3),
+            text=c_tooltips,
+            hovertemplate="%{text}<extra></extra>"
+        ))
+
+# Calculate dynamic axis scale
+all_visible_vals = []
+if sel_client == "Todos" or sel_client not in ["Top 5 Clientes", "Bottom 5 Clientes"]:
+    all_visible_vals = [v for v in y_plan + [x for x in y_real if x is not None] + [x for x in y_proj if x is not None]]
+else:
+    # Include Reference series and client lines
+    all_visible_vals = [v for v in y_plan_total + [x for x in y_proj_total if x is not None]]
+    clients_to_plot = top_5_clients if sel_client == "Top 5 Clientes" else bot_5_clients
+    for client in clients_to_plot:
+        if chart_metric_key == "Ticket Médio":
+            _, _, y_real_c_gmv, _ = get_indicator_series("GMV", target_client=client)
+            _, _, y_real_c_ped, _ = get_indicator_series("Pedidos", target_client=client)
+            y_real_c = [y_real_c_gmv[i] / y_real_c_ped[i] if y_real_c_ped[i] is not None and y_real_c_ped[i] > 0 else None for i in range(len(x_labels))]
+        else:
+            _, _, y_real_c, _ = get_indicator_series(chart_metric_key, target_client=client)
+        all_visible_vals += [v for v in y_real_c if v is not None]
+
 if all_visible_vals:
     ymin = min(all_visible_vals)
     ymax = max(all_visible_vals)
@@ -987,103 +1209,12 @@ quadrants_setup = [
 for quad in quadrants_setup:
     q_key = quad["key"]
     
-    # 1. EXTRACT CLIENT RANKINGS DATA
-    client_data_list = []
-    has_client_level_data = True
-    
-    if "Ano" in viz_mode:
-        total_ytd_real = sum(data_loader.clean_val(monthly_data[c][q_key]["real"][m]) for c in filtered_clients for m in months_up_to)
-        if total_ytd_real == 0:
-            has_client_level_data = False
-        else:
-            for client in filtered_clients:
-                curr_val = sum(data_loader.clean_val(monthly_data[client][q_key]["real"][m]) for m in months_up_to)
-                accum_val = sum(data_loader.clean_val(monthly_data[client][q_key]["plan"][m]) for m in months_up_to)
-                orders_count = sum(data_loader.clean_val(monthly_data[client]["Pedidos"]["real"][m]) for m in months_up_to)
-                
-                if quad["is_ticket"]:
-                    acc_gmv = sum(data_loader.clean_val(monthly_data[client]["GMV"]["real"][m]) for m in months_up_to)
-                    curr_val = acc_gmv / orders_count if orders_count > 0 else 0.0
-                    
-                    acc_gmv_plan = sum(data_loader.clean_val(monthly_data[client]["GMV"]["plan"][m]) for m in months_up_to)
-                    acc_ped_plan = sum(data_loader.clean_val(monthly_data[client]["Pedidos"]["plan"][m]) for m in months_up_to)
-                    accum_val = acc_gmv_plan / acc_ped_plan if acc_ped_plan > 0 else 0.0
-                    
-                client_data_list.append({
-                    "client": client, "curr": curr_val, "accum": accum_val, "orders": orders_count
-                })
-    else:
-        if not has_weeks_data:
-            total_real_month = sum(data_loader.clean_val(monthly_data[c][q_key]["real"][month_sel_en]) for c in filtered_clients)
-            if total_real_month == 0:
-                has_client_level_data = False
-            else:
-                for client in filtered_clients:
-                    curr_val = data_loader.clean_val(monthly_data[client][q_key]["real"][month_sel_en])
-                    accum_val = data_loader.clean_val(monthly_data[client][q_key]["plan"][month_sel_en])
-                    orders_count = data_loader.clean_val(monthly_data[client]["Pedidos"]["real"][month_sel_en])
-                    
-                    if quad["is_ticket"]:
-                        acc_gmv = data_loader.clean_val(monthly_data[client]["GMV"]["real"][month_sel_en])
-                        curr_val = acc_gmv / orders_count if orders_count > 0 else 0.0
-                        
-                        acc_gmv_plan = data_loader.clean_val(monthly_data[client]["GMV"]["plan"][month_sel_en])
-                        acc_ped_plan = data_loader.clean_val(monthly_data[client]["Pedidos"]["plan"][month_sel_en])
-                        accum_val = acc_gmv_plan / acc_ped_plan if acc_ped_plan > 0 else 0.0
-                        
-                    client_data_list.append({
-                        "client": client, "curr": curr_val, "accum": accum_val, "orders": orders_count
-                    })
-        else:
-            for client in filtered_clients:
-                target_m = data_loader.clean_val(weekly_data[client][q_key]["plan"][month_sel_en])
-                
-                weights_row = df_proj.iloc[3]
-                weekly_weights = [data_loader.clean_val(weights_row[col]) for col in weekly_cols]
-                sum_weights = sum(weekly_weights)
-                if sum_weights == 0:
-                    weekly_weights = [1.0 / len(weekly_cols)] * len(weekly_cols)
-                else:
-                    weekly_weights = [w / sum_weights for w in weekly_weights]
-                    
-                if "Semana" in viz_mode:
-                    curr_val = data_loader.clean_val(weekly_data[client][q_key]["weekly"][month_sel_en][selected_week_idx])
-                    accum_val = sum(data_loader.clean_val(weekly_data[client][q_key]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
-                    orders_count = data_loader.clean_val(weekly_data[client]["Pedidos"]["weekly"][month_sel_en][selected_week_idx])
-                    
-                    if quad["is_ticket"]:
-                        wk_gmv = data_loader.clean_val(weekly_data[client]["GMV"]["weekly"][month_sel_en][selected_week_idx])
-                        if orders_count == 0:
-                            continue
-                        curr_val = wk_gmv / orders_count
-                        
-                        acc_gmv_wk = sum(data_loader.clean_val(weekly_data[client]["GMV"]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
-                        acc_ped_wk = sum(data_loader.clean_val(weekly_data[client]["Pedidos"]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
-                        accum_val = acc_gmv_wk / acc_ped_wk if acc_ped_wk > 0 else 0.0
-                else:
-                    curr_val = sum(data_loader.clean_val(weekly_data[client][q_key]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
-                    accum_val = sum(data_loader.clean_val(monthly_data[client][q_key]["real"][m]) for m in months_up_to)
-                    orders_count = sum(data_loader.clean_val(weekly_data[client]["Pedidos"]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
-                    
-                    if quad["is_ticket"]:
-                        acc_gmv_wk = sum(data_loader.clean_val(weekly_data[client]["GMV"]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
-                        if orders_count == 0:
-                            continue
-                        curr_val = acc_gmv_wk / orders_count
-                        
-                        ytd_gmv = sum(data_loader.clean_val(monthly_data[client]["GMV"]["real"][m]) for m in months_up_to)
-                        ytd_ped = sum(data_loader.clean_val(monthly_data[client]["Pedidos"]["real"][m]) for m in months_up_to)
-                        accum_val = ytd_gmv / ytd_ped if ytd_ped > 0 else 0.0
-                        
-                client_data_list.append({
-                    "client": client, "curr": curr_val, "accum": accum_val, "orders": orders_count
-                })
-
-    group_curr_total = sum(c["curr"] for c in client_data_list)
-    sorted_top = sorted(client_data_list, key=lambda x: (-x["curr"], x["client"]))
-    
-    filtered_bottom = [r for r in client_data_list if r["curr"] > 0 and r["accum"] > 0 and r["client"].strip() != ""]
-    sorted_bottom = sorted(filtered_bottom, key=lambda x: (x["curr"], x["client"]))
+    # 1. EXTRACT CLIENT RANKINGS DATA (from precomputed global rankings)
+    metric_rank_info = rankings_by_metric[q_key]
+    has_client_level_data = metric_rank_info["has_data"]
+    sorted_top = metric_rank_info["sorted_top"]
+    sorted_bottom = metric_rank_info["sorted_bottom"]
+    group_curr_total = metric_rank_info["group_curr_total"]
 
     # 3. CHALLENGE CARD METRICS PREPARATION
     if "Ano" in viz_mode:
