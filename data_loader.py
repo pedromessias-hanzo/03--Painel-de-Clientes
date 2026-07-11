@@ -110,6 +110,7 @@ def map_columns(df):
       - weekly columns (W1-W5)
       - real (accumulated actual)
       - diff
+      - comp
     """
     months_map = {}
     months_list = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
@@ -124,15 +125,19 @@ def map_columns(df):
         weekly_cols = []
         real_col = None
         diff_col = None
+        comp_col = None
         
         for col_idx, label in enumerate(row_labels):
-            if label == m:
+            lbl_clean = label.replace('ç', 'c').replace('ã', 'a').replace('õ', 'o').replace('é', 'e').replace('í', 'i')
+            if lbl_clean == m:
                 plan_col = col_idx
-            elif f"{m} (real)" in label or label == f"{m} (real)":
+            elif lbl_clean == f"{m} (real)" or label == f"{m} (real)":
                 real_col = col_idx
-            elif f"diferença ({m})" in label or f"diferena ({m})" in label:
+            elif f"diferenca ({m})" in lbl_clean or f"diferena ({m})" in lbl_clean:
                 diff_col = col_idx
-            elif f"{m} (semana" in label:
+            elif f"comparativo ({m})" in lbl_clean:
+                comp_col = col_idx
+            elif f"{m} (semana" in lbl_clean:
                 weekly_cols.append(col_idx)
                 
         weekly_cols.sort()
@@ -142,7 +147,8 @@ def map_columns(df):
                 "plan": plan_col,
                 "weekly": weekly_cols,
                 "real": real_col,
-                "diff": diff_col
+                "diff": diff_col,
+                "comp": comp_col
             }
             
     return months_map
@@ -150,7 +156,7 @@ def map_columns(df):
 def load_data(sheets_data):
     """
     Loads Excel sheets from the sheets_data dictionary and returns overview and parsed data structures.
-    Uses fallback sheet loader.
+    Uses separate parsing for Planejamento (monthly) and Projeção (weekly) sheets.
     """
     # 1. PARSE OVERVIEW SHEET
     overview_data = {}
@@ -199,82 +205,120 @@ def load_data(sheets_data):
                     "2028": {"GMV": 0.0, "Pedidos": 0.0, "Receita Hanzo": 0.0}
                 }
                 
-    # 2. LOAD PLANEJAMENTO OR PROJEÇÃO DYNAMICALLY
+    # 2. MAP COLUMNS FOR BOTH SHEET DATAFRAMES
     df_pl = sheets_data.get("Planejamento")
     m_map_pl = map_columns(df_pl)
-    has_weekly = any(m_map_pl[m]["weekly"] for m in m_map_pl)
     
-    if has_weekly:
-        df = df_pl
-        m_map = m_map_pl
+    proj_sheet = None
+    for s in ["Projeção", "Projeo"]:
+        if s in sheets_data:
+            proj_sheet = s
+            break
+    
+    if proj_sheet:
+        df_proj = sheets_data[proj_sheet]
+        m_map_proj = map_columns(df_proj)
     else:
-        # Fallback to Projeção
-        proj_sheet = None
-        for s in ["Projeção", "Projeo"]:
-            if s in sheets_data:
-                proj_sheet = s
-                break
-        if proj_sheet:
-            df = sheets_data[proj_sheet]
-            m_map = map_columns(df)
-        else:
-            df = df_pl
-            m_map = m_map_pl
+        df_proj = df_pl
+        m_map_proj = m_map_pl
 
-    # 3. PARSE METRICS
+    # 3. PARSE MONTHLY CONSOLIDATIONS FROM PLANEJAMENTO
     monthly_data = {}
-    
-    # Locate all client rows and clean client names
-    client_blocks = {}
-    for r in range(1, len(df)):
-        lbl = df.iloc[r, 9]
+    pl_client_blocks = {}
+    for r in range(1, len(df_pl)):
+        lbl = df_pl.iloc[r, 9]
         if pd.notna(lbl):
             lbl_str = str(lbl).strip()
-            # Verify structure (GMV is at r+3, Pedidos is at r+4, Receita is at r+6)
-            if r + 6 < len(df):
-                gmv_check = str(df.iloc[r+3, 9]).strip()
-                ped_check = str(df.iloc[r+4, 9]).strip()
-                rec_check = str(df.iloc[r+6, 9]).strip()
+            if r + 6 < len(df_pl):
+                gmv_check = str(df_pl.iloc[r+3, 9]).strip()
+                ped_check = str(df_pl.iloc[r+4, 9]).strip()
+                rec_check = str(df_pl.iloc[r+6, 9]).strip()
                 if 'GMV' in gmv_check and 'Pedido' in ped_check and 'Receita' in rec_check:
                     client_name = clean_client_name(lbl_str)
-                    client_blocks[client_name] = r
+                    pl_client_blocks[client_name] = r
                     
-    # Parse data for each client
-    for client_name, r in client_blocks.items():
+    for client_name, r in pl_client_blocks.items():
         monthly_data[client_name] = {
-            "GMV": {"plan": {}, "real": {}, "weekly": {}},
-            "Pedidos": {"plan": {}, "real": {}, "weekly": {}},
-            "Ticket Médio": {"plan": {}, "real": {}, "weekly": {}},
-            "Receita Hanzo": {"plan": {}, "real": {}, "weekly": {}}
+            "GMV": {"plan": {}, "real": {}},
+            "Pedidos": {"plan": {}, "real": {}},
+            "Ticket Médio": {"plan": {}, "real": {}},
+            "Receita Hanzo": {"plan": {}, "real": {}}
         }
-        
-        for m_name, cols in m_map.items():
+        for m_name, cols in m_map_pl.items():
             plan_col = cols["plan"]
             real_col = cols["real"]
+            
+            monthly_data[client_name]["GMV"]["plan"][m_name] = clean_val(df_pl.iloc[r+3, plan_col])
+            monthly_data[client_name]["GMV"]["real"][m_name] = clean_val(df_pl.iloc[r+3, real_col])
+            
+            monthly_data[client_name]["Pedidos"]["plan"][m_name] = clean_val(df_pl.iloc[r+4, plan_col])
+            monthly_data[client_name]["Pedidos"]["real"][m_name] = clean_val(df_pl.iloc[r+4, real_col])
+            
+            monthly_data[client_name]["Ticket Médio"]["plan"][m_name] = clean_val(df_pl.iloc[r+5, plan_col])
+            monthly_data[client_name]["Ticket Médio"]["real"][m_name] = clean_val(df_pl.iloc[r+5, real_col])
+            
+            monthly_data[client_name]["Receita Hanzo"]["plan"][m_name] = clean_val(df_pl.iloc[r+6, plan_col])
+            monthly_data[client_name]["Receita Hanzo"]["real"][m_name] = clean_val(df_pl.iloc[r+6, real_col])
+
+    # 4. PARSE WEEKLY MONITORING DATA FROM PROJEÇÃO
+    weekly_data = {}
+    proj_client_blocks = {}
+    for r in range(1, len(df_proj)):
+        lbl = df_proj.iloc[r, 9]
+        if pd.notna(lbl):
+            lbl_str = str(lbl).strip()
+            if r + 6 < len(df_proj):
+                gmv_check = str(df_proj.iloc[r+3, 9]).strip()
+                ped_check = str(df_proj.iloc[r+4, 9]).strip()
+                rec_check = str(df_proj.iloc[r+6, 9]).strip()
+                if 'GMV' in gmv_check and 'Pedido' in ped_check and 'Receita' in rec_check:
+                    client_name = clean_client_name(lbl_str)
+                    proj_client_blocks[client_name] = r
+
+    for client_name, r in proj_client_blocks.items():
+        weekly_data[client_name] = {
+            "GMV": {"plan": {}, "real": {}, "weekly": {}, "diff": {}, "comp": {}},
+            "Pedidos": {"plan": {}, "real": {}, "weekly": {}, "diff": {}, "comp": {}},
+            "Ticket Médio": {"plan": {}, "real": {}, "weekly": {}, "diff": {}, "comp": {}},
+            "Receita Hanzo": {"plan": {}, "real": {}, "weekly": {}, "diff": {}, "comp": {}}
+        }
+        for m_name, cols in m_map_proj.items():
+            plan_col = cols["plan"]
+            real_col = cols["real"]
+            diff_col = cols["diff"]
+            comp_col = cols["comp"]
             weekly_cols = cols["weekly"]
             
-            # 1. GMV
-            monthly_data[client_name]["GMV"]["plan"][m_name] = clean_val(df.iloc[r+3, plan_col])
-            monthly_data[client_name]["GMV"]["real"][m_name] = clean_val(df.iloc[r+3, real_col])
-            monthly_data[client_name]["GMV"]["weekly"][m_name] = [clean_val(df.iloc[r+3, col]) for col in weekly_cols]
+            # GMV
+            weekly_data[client_name]["GMV"]["plan"][m_name] = clean_val(df_proj.iloc[r+3, plan_col])
+            weekly_data[client_name]["GMV"]["real"][m_name] = clean_val(df_proj.iloc[r+3, real_col])
+            weekly_data[client_name]["GMV"]["diff"][m_name] = df_proj.iloc[r+3, diff_col] if diff_col is not None else None
+            weekly_data[client_name]["GMV"]["comp"][m_name] = df_proj.iloc[r+3, comp_col] if comp_col is not None else None
+            weekly_data[client_name]["GMV"]["weekly"][m_name] = [clean_val(df_proj.iloc[r+3, col]) for col in weekly_cols]
             
-            # 2. Pedidos
-            monthly_data[client_name]["Pedidos"]["plan"][m_name] = clean_val(df.iloc[r+4, plan_col])
-            monthly_data[client_name]["Pedidos"]["real"][m_name] = clean_val(df.iloc[r+4, real_col])
-            monthly_data[client_name]["Pedidos"]["weekly"][m_name] = [clean_val(df.iloc[r+4, col]) for col in weekly_cols]
+            # Pedidos
+            weekly_data[client_name]["Pedidos"]["plan"][m_name] = clean_val(df_proj.iloc[r+4, plan_col])
+            weekly_data[client_name]["Pedidos"]["real"][m_name] = clean_val(df_proj.iloc[r+4, real_col])
+            weekly_data[client_name]["Pedidos"]["diff"][m_name] = df_proj.iloc[r+4, diff_col] if diff_col is not None else None
+            weekly_data[client_name]["Pedidos"]["comp"][m_name] = df_proj.iloc[r+4, comp_col] if comp_col is not None else None
+            weekly_data[client_name]["Pedidos"]["weekly"][m_name] = [clean_val(df_proj.iloc[r+4, col]) for col in weekly_cols]
             
-            # 3. Ticket Médio
-            monthly_data[client_name]["Ticket Médio"]["plan"][m_name] = clean_val(df.iloc[r+5, plan_col])
-            monthly_data[client_name]["Ticket Médio"]["real"][m_name] = clean_val(df.iloc[r+5, real_col])
-            monthly_data[client_name]["Ticket Médio"]["weekly"][m_name] = [clean_val(df.iloc[r+5, col]) for col in weekly_cols]
+            # Ticket Médio
+            weekly_data[client_name]["Ticket Médio"]["plan"][m_name] = clean_val(df_proj.iloc[r+5, plan_col])
+            weekly_data[client_name]["Ticket Médio"]["real"][m_name] = clean_val(df_proj.iloc[r+5, real_col])
+            weekly_data[client_name]["Ticket Médio"]["diff"][m_name] = df_proj.iloc[r+5, diff_col] if diff_col is not None else None
+            weekly_data[client_name]["Ticket Médio"]["comp"][m_name] = df_proj.iloc[r+5, comp_col] if comp_col is not None else None
+            weekly_data[client_name]["Ticket Médio"]["weekly"][m_name] = [clean_val(df_proj.iloc[r+5, col]) for col in weekly_cols]
             
-            # 4. Receita Hanzo
-            monthly_data[client_name]["Receita Hanzo"]["plan"][m_name] = clean_val(df.iloc[r+6, plan_col])
-            monthly_data[client_name]["Receita Hanzo"]["real"][m_name] = clean_val(df.iloc[r+6, real_col])
-            monthly_data[client_name]["Receita Hanzo"]["weekly"][m_name] = [clean_val(df.iloc[r+6, col]) for col in weekly_cols]
-            
-    # Consolidate metadata
-    all_clients = set(overview_data.keys()).union(set(monthly_data.keys()))
+            # Receita Hanzo
+            weekly_data[client_name]["Receita Hanzo"]["plan"][m_name] = clean_val(df_proj.iloc[r+6, plan_col])
+            weekly_data[client_name]["Receita Hanzo"]["real"][m_name] = clean_val(df_proj.iloc[r+6, real_col])
+            weekly_data[client_name]["Receita Hanzo"]["diff"][m_name] = df_proj.iloc[r+6, diff_col] if diff_col is not None else None
+            weekly_data[client_name]["Receita Hanzo"]["comp"][m_name] = df_proj.iloc[r+6, comp_col] if comp_col is not None else None
+            weekly_data[client_name]["Receita Hanzo"]["weekly"][m_name] = [clean_val(df_proj.iloc[r+6, col]) for col in weekly_cols]
+
+    # 5. CONSOLIDATE METADATA
+    all_clients = set(overview_data.keys()).union(set(monthly_data.keys())).union(set(weekly_data.keys()))
     clients_metadata = {}
     for c in all_clients:
         clients_metadata[c] = {
@@ -282,4 +326,4 @@ def load_data(sheets_data):
             "group": get_client_group(c)
         }
         
-    return overview_data, monthly_data, monthly_data, clients_metadata
+    return overview_data, monthly_data, weekly_data, clients_metadata
