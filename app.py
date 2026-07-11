@@ -164,6 +164,9 @@ st.markdown("""
         border-collapse: collapse;
         font-size: 12.5px !important;
     }
+    .compact-table thead {
+        display: none !important; /* Remove grey header bar visually */
+    }
     .compact-table td {
         padding: 5px 0.5rem;
         height: 30px;
@@ -344,10 +347,10 @@ with col_w_filt:
 
 # Determine mode options dynamically
 if has_weeks_data:
-    mode_options = ["📅 Selected Week", "📈 Month To Date (MTD)", "🏆 Year To Date (YTD)"]
+    mode_options = ["📅 Semana Selecionada", "📈 Acumulado no Mês", "🏆 Acumulado no Ano"]
     default_mode_idx = 1 # MTD
 else:
-    mode_options = ["📈 Consolidado do Mês", "🏆 Year To Date (YTD)"]
+    mode_options = ["📈 Consolidado do Mês", "🏆 Acumulado no Ano"]
     default_mode_idx = 0 # Consolidado do Mês
 
 with col_mode_filt:
@@ -397,7 +400,7 @@ def get_kpi_metrics(metric_key):
     projection = 0.0
     
     # 1. ACTUAL & PLANNED VALUE (based on Mode)
-    if "YTD" in viz_mode:
+    if "Ano" in viz_mode:
         for m in months_up_to:
             for c in filtered_clients:
                 actual += data_loader.clean_val(monthly_data[c][metric_key]["real"][m])
@@ -436,7 +439,7 @@ def get_kpi_metrics(metric_key):
                     elapsed_w += 1
             K_w = max(1, elapsed_w)
             
-            if "Week" in viz_mode:
+            if "Semana" in viz_mode:
                 for c in filtered_clients:
                     actual += data_loader.clean_val(weekly_data[c][metric_key]["weekly"][month_sel_en][selected_week_idx])
                 planned = m_plan_month * weekly_weights[selected_week_idx]
@@ -475,7 +478,7 @@ kpis_values = {
 kpi_achievements = []
 for k, v in kpis_values.items():
     if v["plan"] > 0:
-        ach = v["proj"] / v["plan"] if "YTD" in viz_mode or "MTD" in viz_mode or not has_weeks_data else v["actual"] / v["plan"]
+        ach = v["proj"] / v["plan"] if "Ano" in viz_mode or "Mês" in viz_mode or not has_weeks_data else v["actual"] / v["plan"]
     else:
         ach = 0.0
     kpi_achievements.append(ach)
@@ -488,7 +491,32 @@ elif avg_kpi_ach >= 0.90:
 else:
     overall_farol, overall_status, badge_class = "🔴", "Abaixo da Meta", "status-red"
 
-# Top KPIs Row
+# Header Row
+col_title, col_status = st.columns([3, 1])
+with col_title:
+    st.markdown(f'''
+    <div class="cockpit-header">
+        <h1 class="cockpit-title">HANZO DO BRASIL</h1>
+        <div class="cockpit-subtitle">
+            Mês: <b>{month_sel_pt} 2026</b> | 
+            Semana: <b>{week_sel_label if has_weeks_data else "Sem divisão semanal"}</b> | 
+            Modo: <b>{viz_mode[2:]}</b> | 
+            Grupo: <b>{group_filter}</b> | 
+            Última Atualização: {last_modified.strftime("%d/%m/%Y %H:%M:%S")}
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+with col_status:
+    st.markdown(f'''
+    <div class="status-badge-container">
+        <div class="status-badge {badge_class}">
+            STATUS DO MÊS: {overall_farol} {overall_status}
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+# 2. EXECUTIVE KPI CARDS ROW (at the top)
 col_c1, col_c2, col_c3, col_c4 = st.columns(4)
 
 kpis_setup = [
@@ -510,7 +538,7 @@ for card in kpis_setup:
         gap_val = ((c_vals["actual"] - c_vals["plan"]) / c_vals["plan"]) * 100
         gap_pct_str = f"{gap_val:+.1f}%".replace(".", ",")
         
-        ach_pct = c_vals["proj"] / c_vals["plan"] if "YTD" in viz_mode or "MTD" in viz_mode or not has_weeks_data else c_vals["actual"] / c_vals["plan"]
+        ach_pct = c_vals["proj"] / c_vals["plan"] if "Ano" in viz_mode or "Mês" in viz_mode or not has_weeks_data else c_vals["actual"] / c_vals["plan"]
         if ach_pct >= 0.95:
             card_farol = "🟢"
             card_color = "#166534"
@@ -562,8 +590,6 @@ quadrants_setup = [
     {"slot": row2_col2, "title": "TICKET MÉDIO", "key": "Ticket Médio", "fmt": fmt_currency, "is_ticket": True}
 ]
 
-total_weeks_sel = len(m_map_proj[month_sel_en]["weekly"]) if month_sel_en in m_map_proj else 0
-
 for quad in quadrants_setup:
     q_key = quad["key"]
     
@@ -571,7 +597,7 @@ for quad in quadrants_setup:
     client_data_list = []
     has_client_level_data = True
     
-    if "YTD" in viz_mode:
+    if "Ano" in viz_mode:
         total_ytd_real = sum(data_loader.clean_val(monthly_data[c][q_key]["real"][m]) for c in filtered_clients for m in months_up_to)
         if total_ytd_real == 0:
             has_client_level_data = False
@@ -626,7 +652,7 @@ for quad in quadrants_setup:
                 else:
                     weekly_weights = [w / sum_weights for w in weekly_weights]
                     
-                if "Week" in viz_mode:
+                if "Semana" in viz_mode:
                     curr_val = data_loader.clean_val(weekly_data[client][q_key]["weekly"][month_sel_en][selected_week_idx])
                     accum_val = sum(data_loader.clean_val(weekly_data[client][q_key]["weekly"][month_sel_en][w]) for w in range(selected_week_idx + 1))
                     orders_count = data_loader.clean_val(weekly_data[client]["Pedidos"]["weekly"][month_sel_en][selected_week_idx])
@@ -665,8 +691,8 @@ for quad in quadrants_setup:
     filtered_bottom = [r for r in client_data_list if r["curr"] > 0 and r["accum"] > 0 and r["client"].strip() != ""]
     sorted_bottom = sorted(filtered_bottom, key=lambda x: (x["curr"], x["client"]))
 
-    # 2. CHALLENGE CARD METRICS PREPARATION (Projeção)
-    if "YTD" in viz_mode:
+    # 3. CHALLENGE CARD METRICS PREPARATION
+    if "Ano" in viz_mode:
         if quad["is_ticket"]:
             g_tgt = sum(data_loader.clean_val(monthly_data[c]["GMV"]["plan"][m]) for c in filtered_clients for m in EN_MONTHS)
             p_tgt = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["plan"][m]) for c in filtered_clients for m in EN_MONTHS)
@@ -686,7 +712,7 @@ for quad in quadrants_setup:
     diff_challenge = None
     is_latest_wk = (selected_week_idx == len(weekly_cols) - 1)
     
-    if is_latest_wk and "YTD" not in viz_mode and has_weeks_data:
+    if is_latest_wk and "Ano" not in viz_mode and has_weeks_data:
         diff_list = [weekly_data[c][q_key]["diff"][month_sel_en] for c in filtered_clients]
         diff_numeric = [clean_val(x) for x in diff_list if x is not None and not pd.isna(x)]
         if len(diff_numeric) == len(filtered_clients):
@@ -695,7 +721,7 @@ for quad in quadrants_setup:
     if diff_challenge is None:
         diff_challenge = target_val - accum_challenge
 
-    if "YTD" in viz_mode:
+    if "Ano" in viz_mode:
         remaining_months_count = 11 - EN_MONTHS.index(month_sel_en)
         weeks_left_curr = len(weekly_cols) - (selected_week_idx + 1) if has_weeks_data else 0
         rem_weeks = weeks_left_curr + (4 * remaining_months_count)
@@ -709,7 +735,7 @@ for quad in quadrants_setup:
         challenge_color = "#64748B"
         badge_theme = "status-neutral"
     elif diff_challenge <= 0:
-        challenge_msg = "Meta já atingida"
+        challenge_msg = "Meta atingida"
         req_avg_str = "0"
         challenge_status = "🟢"
         challenge_color = "#166534"
@@ -723,7 +749,7 @@ for quad in quadrants_setup:
             challenge_color = "#854D0E"
             badge_theme = "status-yellow"
         else:
-            challenge_msg = "Mês encerrado abaixo da meta" if "YTD" not in viz_mode else "Ano encerrado abaixo da meta"
+            challenge_msg = "Mês encerrado abaixo da meta" if "Ano" not in viz_mode else "Ano encerrado abaixo da meta"
             req_avg_str = "N/A"
             challenge_status = "🔴"
             challenge_color = "#991B1B"
@@ -734,12 +760,55 @@ for quad in quadrants_setup:
         st.markdown(f'<div class="quadrant-container">', unsafe_allow_html=True)
         st.markdown(f'<div class="quadrant-title">{quad["title"]}</div>', unsafe_allow_html=True)
         
-        # 1. TOP 5 CLIENTS TABLE
+        # 1. QUADRANT KPI CARD
+        quad_c_vals = kpis_values[q_key]
+        if quad_c_vals["plan"] == 0:
+            q_gap_str = "Meta não definida"
+            q_farol = "—"
+            q_color = "#64748B"
+        else:
+            q_gap = ((quad_c_vals["actual"] - quad_c_vals["plan"]) / quad_c_vals["plan"]) * 100
+            q_gap_str = f"{q_gap:+.1f}%".replace(".", ",")
+            
+            q_ach = quad_c_vals["proj"] / quad_c_vals["plan"] if "Ano" in viz_mode or "Mês" in viz_mode or not has_weeks_data else quad_c_vals["actual"] / quad_c_vals["plan"]
+            if q_ach >= 0.95:
+                q_farol = "🟢"
+                q_color = "#166534"
+            elif q_ach >= 0.90:
+                q_farol = "🟡"
+                q_color = "#854D0E"
+            else:
+                q_farol = "🔴"
+                q_color = "#991B1B"
+                
+        st.markdown(f'''
+        <div class="kpi-card" style="margin-bottom:1rem; border-color:#CBD5E1;">
+            <div class="kpi-main-val" style="font-size:26px !important;">{quad["fmt"](quad_c_vals["actual"])}</div>
+            <div class="kpi-sub-row" style="margin-top:0.5rem; padding-top:0.4rem;">
+                <div>
+                    <div class="kpi-sub-label">PLANEJADO</div>
+                    <div class="kpi-sub-val">{quad["fmt"](quad_c_vals["plan"])}</div>
+                </div>
+                <div>
+                    <div class="kpi-sub-label">PROJEÇÃO RITMO ATUAL</div>
+                    <div class="kpi-sub-val">{quad["fmt"](quad_c_vals["proj"])}</div>
+                </div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.3rem; border-top:1px solid #E2E8F0; padding-top:0.3rem;">
+                <span style="font-size:0.75rem; font-weight:700; color:#475569;">Desvio Real/Plan:</span>
+                <span style="font-size:0.8rem; font-weight:800; color:{q_color};">
+                    {q_gap_str} <span class="kpi-light">{q_farol}</span>
+                </span>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        # 2. TOP 5 CLIENTS TABLE
         tbl_top_title = "🏆 Top 5 Clientes do Mês" if not has_weeks_data else "🏆 Top 5 Clients"
         st.markdown(f'<div class="table-section-title">{tbl_top_title}</div>', unsafe_allow_html=True)
         
         if not has_client_level_data:
-            msg_unavail = "Ranking YTD por client indisponível para este período." if "YTD" in viz_mode else "Ranking por cliente indisponível para este mês."
+            msg_unavail = "Ranking YTD por cliente indisponível para este período." if "Ano" in viz_mode else "Ranking por cliente indisponível para este mês."
             st.markdown(f'<div style="text-align:center; color:#64748B; font-size:13px; margin: 0.5rem 0;">{msg_unavail}</div>', unsafe_allow_html=True)
         else:
             st.markdown(f'''
@@ -769,12 +838,12 @@ for quad in quadrants_setup:
             
         st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
         
-        # 2. BOTTOM 5 CLIENTS TABLE
+        # 3. BOTTOM 5 CLIENTS TABLE
         tbl_bot_title = "📉 Bottom 5 Clientes com Movimentação no Mês" if not has_weeks_data else "📉 Bottom 5 Clients with Activity"
         st.markdown(f'<div class="table-section-title">{tbl_bot_title}</div>', unsafe_allow_html=True)
         
         if not has_client_level_data:
-            msg_unavail = "Ranking YTD por client indisponível para este período." if "YTD" in viz_mode else "Ranking por cliente indisponível para este mês."
+            msg_unavail = "Ranking YTD por cliente indisponível para este período." if "Ano" in viz_mode else "Ranking por cliente indisponível para este mês."
             st.markdown(f'<div style="text-align:center; color:#64748B; font-size:13px; margin: 0.5rem 0;">{msg_unavail}</div>', unsafe_allow_html=True)
         else:
             st.markdown(f'''
@@ -807,86 +876,117 @@ for quad in quadrants_setup:
             
         st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
         
-        # 3. CLIENT PERFORMANCE DISTRIBUTION CHART (diverging bar chart)
-        st.markdown(f'<div class="table-section-title">Distribuição de Performance dos Clientes</div>', unsafe_allow_html=True)
+        # 4. TOP 5 EVOLUTION LINE CHART (Planejamento Jan-Dec)
+        st.markdown('<div class="table-section-title">Evolução Mensal - Top 5 Clientes</div>', unsafe_allow_html=True)
         
-        chart_bars = []
+        fig_top = go.Figure()
+        green_palette = ['#166534', '#22c55e', '#4ade80', '#86efac', '#bbf7d0']
         
-        # Bottom 5 (Slate Grey)
-        for idx, row in enumerate(reversed(sorted_bottom[:5])):
-            share_val = (row["curr"] / group_curr_total) * 100 if group_curr_total > 0 else 0.0
-            chart_bars.append({
-                "client_label": row["client"] + " (Bottom)",
-                "client_display": row["client"],
-                "val": -row["curr"],
-                "color": "#64748B",
-                "share": share_val,
-                "val_real": row["curr"]
-            })
-            
-        # Top 5 (Emerald Green)
-        for idx, row in enumerate(reversed(sorted_top[:5])):
-            share_val = (row["curr"] / group_curr_total) * 100 if group_curr_total > 0 else 0.0
-            chart_bars.append({
-                "client_label": row["client"] + " (Top)",
-                "client_display": row["client"],
-                "val": row["curr"],
-                "color": "#166534",
-                "share": share_val,
-                "val_real": row["curr"]
-            })
-            
-        fig = go.Figure()
-        
-        if chart_bars:
-            x_vals = [b["val"] for b in chart_bars]
-            y_vals = [b["client_label"] for b in chart_bars]
-            text_vals = []
-            for b in chart_bars:
-                if quad["is_ticket"]:
-                    text_vals.append(f"{b['client_display']}: {quad['fmt'](b['val_real'])}")
-                else:
-                    text_vals.append(f"{b['client_display']}: {quad['fmt'](b['val_real'])} ({b['share']:.1f}%)")
+        if has_client_level_data and sorted_top:
+            for c_idx, row in enumerate(sorted_top[:5]):
+                client = row["client"]
+                color = green_palette[c_idx % len(green_palette)]
+                
+                y_vals = []
+                tooltip_texts = []
+                for m in EN_MONTHS:
+                    m_val = data_loader.clean_val(monthly_data[client][q_key]["real"][m])
+                    m_total = sum(data_loader.clean_val(monthly_data[c][q_key]["real"][m]) for c in filtered_clients)
+                    m_share = (m_val / m_total) * 100 if m_total > 0 else 0.0
                     
-            fig.add_trace(go.Bar(
-                x=x_vals,
-                y=y_vals,
-                orientation='h',
-                marker_color=[b["color"] for b in chart_bars],
-                text=text_vals,
-                textposition='outside',
-                textfont=dict(size=11, color="#0F172A"),
-                hoverinfo='text'
-            ))
-            
-        fig.update_layout(
-            height=300,
+                    if m_val > 0 or m == month_sel_en:
+                        y_vals.append(m_val)
+                    else:
+                        y_vals.append(None)
+                        
+                    tooltip_texts.append(f"Cliente: {client}<br>Mês: {PT_MONTH_DISPLAY[m]}<br>Valor: {quad['fmt'](m_val)}<br>Share: {m_share:.1f}%")
+                    
+                fig_top.add_trace(go.Scatter(
+                    x=PT_MONTHS,
+                    y=y_vals,
+                    name=client,
+                    mode='lines+markers',
+                    line=dict(color=color, width=2),
+                    marker=dict(
+                        size=[10 if m == month_sel_en else 4 for m in EN_MONTHS],
+                        color=['#D97706' if m == month_sel_en else color for m in EN_MONTHS],
+                        line=dict(color='#FFFFFF', width=1.5)
+                    ),
+                    text=tooltip_texts,
+                    hovertemplate="%{text}<extra></extra>"
+                ))
+                
+        fig_top.update_layout(
+            height=280,
             margin=dict(l=10, r=10, t=10, b=10),
-            showlegend=False,
+            showlegend=True,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10)),
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
-            xaxis=dict(
-                showgrid=True,
-                gridcolor="#F1F5F9",
-                zeroline=True,
-                zerolinecolor="#CBD5E1",
-                zerolinewidth=2,
-                showticklabels=False
-            ),
-            yaxis=dict(
-                showgrid=False,
-                showticklabels=False
-            )
+            xaxis=dict(showgrid=True, gridcolor="#F1F5F9"),
+            yaxis=dict(showgrid=True, gridcolor="#F1F5F9")
         )
-        
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig_top, use_container_width=True)
         st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
         
-        # 4. CHALLENGE TO TARGET CARD
+        # 5. BOTTOM 5 EVOLUTION LINE CHART (Planejamento Jan-Dec)
+        st.markdown('<div class="table-section-title">Evolução Mensal - Bottom 5 Clientes</div>', unsafe_allow_html=True)
+        
+        fig_bot = go.Figure()
+        gray_palette = ['#334155', '#475569', '#64748B', '#94a3b8', '#cbd5e1']
+        
+        if has_client_level_data and sorted_bottom:
+            for c_idx, row in enumerate(sorted_bottom[:5]):
+                client = row["client"]
+                color = gray_palette[c_idx % len(gray_palette)]
+                
+                y_vals = []
+                tooltip_texts = []
+                for m in EN_MONTHS:
+                    m_val = data_loader.clean_val(monthly_data[client][q_key]["real"][m])
+                    m_total = sum(data_loader.clean_val(monthly_data[c][q_key]["real"][m]) for c in filtered_clients)
+                    m_share = (m_val / m_total) * 100 if m_total > 0 else 0.0
+                    
+                    if m_val > 0 or m == month_sel_en:
+                        y_vals.append(m_val)
+                    else:
+                        y_vals.append(None)
+                        
+                    tooltip_texts.append(f"Cliente: {client}<br>Mês: {PT_MONTH_DISPLAY[m]}<br>Valor: {quad['fmt'](m_val)}<br>Share: {m_share:.1f}%")
+                    
+                fig_bot.add_trace(go.Scatter(
+                    x=PT_MONTHS,
+                    y=y_vals,
+                    name=client,
+                    mode='lines+markers',
+                    line=dict(color=color, width=2),
+                    marker=dict(
+                        size=[10 if m == month_sel_en else 4 for m in EN_MONTHS],
+                        color=['#D97706' if m == month_sel_en else color for m in EN_MONTHS],
+                        line=dict(color='#FFFFFF', width=1.5)
+                    ),
+                    text=tooltip_texts,
+                    hovertemplate="%{text}<extra></extra>"
+                ))
+                
+        fig_bot.update_layout(
+            height=280,
+            margin=dict(l=10, r=10, t=10, b=10),
+            showlegend=True,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10)),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            xaxis=dict(showgrid=True, gridcolor="#F1F5F9"),
+            yaxis=dict(showgrid=True, gridcolor="#F1F5F9")
+        )
+        st.plotly_chart(fig_bot, use_container_width=True)
+        st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
+        
+        # 6. CHALLENGE TO TARGET CARD (Projeção)
         st.markdown(f'''
         <div class="kpi-card" style="border: 1px solid #E2E8F0; padding:1rem; background-color:#FFFFFF;">
             <div style="font-size:0.8rem; font-weight:700; color:#64748B; letter-spacing:0.5px; text-transform:uppercase;">
-                DESAFIO PARA A META ({"ANUAL" if "YTD" in viz_mode else "MENSAL"})
+                DESAFIO PARA A META ({"ANUAL" if "Ano" in viz_mode else "MENSAL"})
             </div>
             <div style="font-size:1.15rem; font-weight:800; color:{challenge_color}; margin-top:0.4rem; margin-bottom:0.75rem;">
                 {challenge_status} {challenge_msg}
