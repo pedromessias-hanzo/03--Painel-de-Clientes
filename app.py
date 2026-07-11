@@ -530,24 +530,45 @@ for card in kpis_setup:
     k_key = card["key"]
     c_vals = kpis_values[k_key]
     
+    # Real x Planejado status and percent
     if c_vals["plan"] == 0:
-        gap_pct_str = "Meta não definida"
-        card_farol = "—"
-        card_color = "#64748B"
+        real_pct_str = "- %"
+        real_farol = "⚪"
+        real_color = "#64748B"
     else:
-        gap_val = ((c_vals["actual"] - c_vals["plan"]) / c_vals["plan"]) * 100
-        gap_pct_str = f"{gap_val:+.1f}%".replace(".", ",")
+        real_ratio = c_vals["actual"] / c_vals["plan"]
+        real_pct = ((c_vals["actual"] - c_vals["plan"]) / c_vals["plan"]) * 100
+        real_pct_str = f"{real_pct:+.1f}%".replace(".", ",")
         
-        ach_pct = c_vals["proj"] / c_vals["plan"] if "Ano" in viz_mode or "Mês" in viz_mode or not has_weeks_data else c_vals["actual"] / c_vals["plan"]
-        if ach_pct >= 0.95:
-            card_farol = "🟢"
-            card_color = "#166534"
-        elif ach_pct >= 0.90:
-            card_farol = "🟡"
-            card_color = "#854D0E"
+        if real_ratio >= 1.0:
+            real_farol = "🟢"
+            real_color = "#166534"
+        elif real_ratio >= 0.90:
+            real_farol = "🟡"
+            real_color = "#854D0E"
         else:
-            card_farol = "🔴"
-            card_color = "#991B1B"
+            real_farol = "🔴"
+            real_color = "#991B1B"
+            
+    # Projeção x Planejado status and percent
+    if c_vals["plan"] == 0:
+        proj_pct_str = "- %"
+        proj_farol = "⚪"
+        proj_color = "#64748B"
+    else:
+        proj_ratio = c_vals["proj"] / c_vals["plan"]
+        proj_pct = ((c_vals["proj"] - c_vals["plan"]) / c_vals["plan"]) * 100
+        proj_pct_str = f"{proj_pct:+.1f}%".replace(".", ",")
+        
+        if proj_ratio >= 1.0:
+            proj_farol = "🟢"
+            proj_color = "#166534"
+        elif proj_ratio >= 0.90:
+            proj_farol = "🟡"
+            proj_color = "#854D0E"
+        else:
+            proj_farol = "🔴"
+            proj_color = "#991B1B"
             
     with card["col"]:
         st.markdown(f'''
@@ -564,16 +585,395 @@ for card in kpis_setup:
                     <div class="kpi-sub-val">{card["fmt"](c_vals["proj"])}</div>
                 </div>
             </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.4rem; border-top:1px solid #E2E8F0; padding-top:0.4rem;">
-                <span style="font-size:0.8rem; font-weight:700; color:#475569;">Desvio Real/Plan:</span>
-                <span style="font-size:0.85rem; font-weight:800; color:{card_color};">
-                    {gap_pct_str} <span class="kpi-light">{card_farol}</span>
-                </span>
+            <div style="margin-top:0.4rem; border-top:1px solid #E2E8F0; padding-top:0.4rem; font-size:0.8rem; font-weight:700;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
+                    <span style="color:#475569;">Real x Planejado:</span>
+                    <span style="color:{real_color}; font-weight:800;">{real_pct_str} <span class="kpi-light">{real_farol}</span></span>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="color:#475569;">Projeção x Planejado:</span>
+                    <span style="color:{proj_color}; font-weight:800;">{proj_pct_str} <span class="kpi-light">{proj_farol}</span></span>
+                </div>
             </div>
         </div>
         ''', unsafe_allow_html=True)
 
 st.markdown('<br>', unsafe_allow_html=True)
+
+# New Section: Evolução dos Indicadores — Planejado, Real e Projeção
+st.markdown('<div class="quadrant-title" style="margin-top:0.5rem; margin-bottom:1rem;">Evolução dos Indicadores — Planejado, Real e Projeção</div>', unsafe_allow_html=True)
+
+col_chart_sel, _ = st.columns([2.5, 5.5])
+with col_chart_sel:
+    sel_indicator = st.selectbox(
+        "Indicador em análise",
+        ["GMV", "Receita", "Pedidos", "Ticket Médio"],
+        key="sel_indicator_evolution_chart"
+    )
+
+# Map key names
+ind_key_map = {
+    "GMV": "GMV",
+    "Receita": "Receita Hanzo",
+    "Pedidos": "Pedidos",
+    "Ticket Médio": "Ticket Médio"
+}
+chart_metric_key = ind_key_map[sel_indicator]
+chart_fmt = fmt_qty if sel_indicator == "Pedidos" else fmt_currency
+short_label = {"GMV": "GMV", "Receita Hanzo": "Receita", "Pedidos": "Pedidos", "Ticket Médio": "Ticket Médio"}[chart_metric_key]
+
+# Calculate lists of values for the chart
+x_labels = []
+y_plan = []
+y_real = []
+y_proj = []
+
+if has_weeks_data and "Ano" not in viz_mode:
+    # Weekly view: "Semana Selecionada" or "Acumulado no Mês"
+    weekly_cols_active = m_map_proj[month_sel_en]["weekly"]
+    num_weeks_active = len(weekly_cols_active)
+    x_labels = [f"Semana {i+1}" for i in range(num_weeks_active)]
+    selected_idx = selected_week_idx
+    
+    weights_row = df_proj.iloc[3]
+    weekly_weights = [data_loader.clean_val(weights_row[col]) for col in weekly_cols_active]
+    sum_weights = sum(weekly_weights)
+    if sum_weights == 0:
+        weekly_weights = [1.0 / num_weeks_active] * num_weeks_active
+    else:
+        weekly_weights = [w / sum_weights for w in weekly_weights]
+        
+    m_plan_val = sum(data_loader.clean_val(monthly_data[c][chart_metric_key]["plan"][month_sel_en]) for c in filtered_clients)
+    
+    for w in range(num_weeks_active):
+        w_real_val = sum(data_loader.clean_val(weekly_data[c][chart_metric_key]["weekly"][month_sel_en][w]) for c in filtered_clients)
+        
+        if "Semana" in viz_mode:
+            p_val = m_plan_val * weekly_weights[w]
+            r_val = w_real_val if w <= selected_week_idx else None
+            
+            if chart_metric_key == "Ticket Médio":
+                w_gmv = sum(data_loader.clean_val(weekly_data[c]["GMV"]["weekly"][month_sel_en][w]) for c in filtered_clients)
+                w_ped = sum(data_loader.clean_val(weekly_data[c]["Pedidos"]["weekly"][month_sel_en][w]) for c in filtered_clients)
+                r_val = w_gmv / w_ped if w_ped > 0 and w <= selected_week_idx else None
+                
+                plan_gmv_m = sum(data_loader.clean_val(monthly_data[c]["GMV"]["plan"][month_sel_en]) for c in filtered_clients)
+                plan_ped_m = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["plan"][month_sel_en]) for c in filtered_clients)
+                p_val = plan_gmv_m / plan_ped_m if plan_ped_m > 0 else 0.0
+                
+            y_plan.append(p_val)
+            y_real.append(r_val)
+            
+            if r_val is not None:
+                acc_gmv_up_to_w = sum(sum(data_loader.clean_val(weekly_data[c]["GMV"]["weekly"][month_sel_en][k]) for c in filtered_clients) for k in range(w + 1))
+                acc_ped_up_to_w = sum(sum(data_loader.clean_val(weekly_data[c]["Pedidos"]["weekly"][month_sel_en][k]) for c in filtered_clients) for k in range(w + 1))
+                
+                if chart_metric_key == "Ticket Médio":
+                    proj_val = acc_gmv_up_to_w / acc_ped_up_to_w if acc_ped_up_to_w > 0 else 0.0
+                elif chart_metric_key == "Pedidos":
+                    proj_val = ((acc_ped_up_to_w / (w + 1)) * num_weeks_active) / num_weeks_active
+                else:
+                    acc_val_up_to_w = sum(sum(data_loader.clean_val(weekly_data[c][chart_metric_key]["weekly"][month_sel_en][k]) for c in filtered_clients) for k in range(w + 1))
+                    proj_val = ((acc_val_up_to_w / (w + 1)) * num_weeks_active) / num_weeks_active
+                y_proj.append(proj_val)
+            else:
+                y_proj.append(None)
+                
+        else:
+            # Acumulado no Mês (MTD)
+            p_val = m_plan_val * sum(weekly_weights[:w+1])
+            
+            if w <= selected_week_idx:
+                if chart_metric_key == "Ticket Médio":
+                    acc_gmv_up_to_w = sum(sum(data_loader.clean_val(weekly_data[c]["GMV"]["weekly"][month_sel_en][k]) for c in filtered_clients) for k in range(w + 1))
+                    acc_ped_up_to_w = sum(sum(data_loader.clean_val(weekly_data[c]["Pedidos"]["weekly"][month_sel_en][k]) for c in filtered_clients) for k in range(w + 1))
+                    r_val = acc_gmv_up_to_w / acc_ped_up_to_w if acc_ped_up_to_w > 0 else 0.0
+                    
+                    plan_gmv_m = sum(data_loader.clean_val(monthly_data[c]["GMV"]["plan"][month_sel_en]) for c in filtered_clients)
+                    plan_ped_m = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["plan"][month_sel_en]) for c in filtered_clients)
+                    p_val = plan_gmv_m / plan_ped_m if plan_ped_m > 0 else 0.0
+                else:
+                    r_val = sum(sum(data_loader.clean_val(weekly_data[c][chart_metric_key]["weekly"][month_sel_en][k]) for c in filtered_clients) for k in range(w + 1))
+            else:
+                r_val = None
+                
+            y_plan.append(p_val)
+            y_real.append(r_val)
+            
+            if r_val is not None:
+                if chart_metric_key == "Ticket Médio":
+                    acc_gmv_up_to_w = sum(sum(data_loader.clean_val(weekly_data[c]["GMV"]["weekly"][month_sel_en][k]) for c in filtered_clients) for k in range(w + 1))
+                    acc_ped_up_to_w = sum(sum(data_loader.clean_val(weekly_data[c]["Pedidos"]["weekly"][month_sel_en][k]) for c in filtered_clients) for k in range(w + 1))
+                    proj_val = acc_gmv_up_to_w / acc_ped_up_to_w if acc_ped_up_to_w > 0 else 0.0
+                else:
+                    proj_val = (r_val / (w + 1)) * num_weeks_active
+                y_proj.append(proj_val)
+            else:
+                y_proj.append(None)
+else:
+    # Monthly / YTD view: Jan to Dec
+    x_labels = PT_MONTHS
+    selected_idx = EN_MONTHS.index(month_sel_en)
+    acc_plan = 0.0
+    acc_real = 0.0
+    
+    for m_idx, m in enumerate(EN_MONTHS):
+        m_plan_val = sum(data_loader.clean_val(monthly_data[c][chart_metric_key]["plan"][m]) for c in filtered_clients)
+        m_real_val = sum(data_loader.clean_val(monthly_data[c][chart_metric_key]["real"][m]) for c in filtered_clients)
+        
+        if "Ano" in viz_mode:
+            # YTD accumulated monthly series
+            acc_plan += m_plan_val
+            if m_idx <= EN_MONTHS.index(month_sel_en):
+                acc_real += m_real_val
+                r_val = acc_real
+            else:
+                r_val = None
+                
+            p_val = acc_plan
+            
+            if chart_metric_key == "Ticket Médio":
+                ytd_gmv_plan = sum(data_loader.clean_val(monthly_data[c]["GMV"]["plan"][k]) for c in filtered_clients for k in EN_MONTHS[:m_idx + 1])
+                ytd_ped_plan = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["plan"][k]) for c in filtered_clients for k in EN_MONTHS[:m_idx + 1])
+                p_val = ytd_gmv_plan / ytd_ped_plan if ytd_ped_plan > 0 else 0.0
+                
+                if r_val is not None:
+                    ytd_gmv_real = sum(data_loader.clean_val(monthly_data[c]["GMV"]["real"][k]) for c in filtered_clients for k in EN_MONTHS[:m_idx + 1])
+                    ytd_ped_real = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["real"][k]) for c in filtered_clients for k in EN_MONTHS[:m_idx + 1])
+                    r_val = ytd_gmv_real / ytd_ped_real if ytd_ped_real > 0 else 0.0
+                    
+            y_plan.append(p_val)
+            y_real.append(r_val)
+            
+            if r_val is not None:
+                if chart_metric_key == "Ticket Médio":
+                    proj_val = r_val
+                else:
+                    proj_val = (r_val / (m_idx + 1)) * 12
+                y_proj.append(proj_val)
+            else:
+                y_proj.append(None)
+        else:
+            # Consolidado do Mês
+            p_val = m_plan_val
+            r_val = m_real_val if m_idx <= EN_MONTHS.index(month_sel_en) else None
+            
+            if chart_metric_key == "Ticket Médio":
+                m_gmv_plan = sum(data_loader.clean_val(monthly_data[c]["GMV"]["plan"][m]) for c in filtered_clients)
+                m_ped_plan = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["plan"][m]) for c in filtered_clients)
+                p_val = m_gmv_plan / m_ped_plan if m_ped_plan > 0 else 0.0
+                
+                if r_val is not None:
+                    m_gmv_real = sum(data_loader.clean_val(monthly_data[c]["GMV"]["real"][m]) for c in filtered_clients)
+                    m_ped_real = sum(data_loader.clean_val(monthly_data[c]["Pedidos"]["real"][m]) for c in filtered_clients)
+                    r_val = m_gmv_real / m_ped_real if m_ped_real > 0 else 0.0
+                    
+            y_plan.append(p_val)
+            y_real.append(r_val)
+            
+            if r_val is not None:
+                proj_val = r_val
+                y_proj.append(proj_val)
+            else:
+                y_proj.append(None)
+
+# Calculate indicators for status annotations
+plan_last = y_plan[selected_idx]
+real_last = y_real[selected_idx] if y_real[selected_idx] is not None else 0.0
+proj_last = y_proj[selected_idx] if y_proj[selected_idx] is not None else 0.0
+
+if plan_last == 0:
+    real_gap_val = 0.0
+    real_farol = "⚪"
+    real_color = "#64748B"
+    real_status_label = "Real x Planejado: - % ⚪"
+    
+    proj_gap_val = 0.0
+    proj_farol = "⚪"
+    proj_color = "#64748B"
+    proj_status_label = "Projeção x Planejado: - % ⚪"
+else:
+    real_ratio = real_last / plan_last
+    real_gap_val = ((real_last - plan_last) / plan_last) * 100
+    if real_ratio >= 1.0:
+        real_farol = "🟢"
+        real_color = "#166534"
+    elif real_ratio >= 0.90:
+        real_farol = "🟡"
+        real_color = "#854D0E"
+    else:
+        real_farol = "🔴"
+        real_color = "#991B1B"
+    real_status_label = f"Real x Planejado: {real_gap_val:+.1f}% {real_farol}".replace(".", ",")
+        
+    proj_ratio = proj_last / plan_last
+    proj_gap_val = ((proj_last - plan_last) / plan_last) * 100
+    if proj_ratio >= 1.0:
+        proj_farol = "🟢"
+        proj_color = "#166534"
+    elif proj_ratio >= 0.90:
+        proj_farol = "🟡"
+        proj_color = "#854D0E"
+    else:
+        proj_farol = "🔴"
+        proj_color = "#991B1B"
+    proj_status_label = f"Projeção x Planejado: {proj_gap_val:+.1f}% {proj_farol}".replace(".", ",")
+
+# Compute shaded desvio areas
+valid_x = x_labels[:selected_idx+1]
+valid_plan = y_plan[:selected_idx+1]
+valid_real = [v if v is not None else 0.0 for v in y_real[:selected_idx+1]]
+valid_proj = [v if v is not None else 0.0 for v in y_proj[:selected_idx+1]]
+
+fill_x = valid_x + valid_x[::-1]
+fill_y_real = valid_plan + valid_real[::-1]
+fill_y_proj = valid_plan + valid_proj[::-1]
+
+if plan_last == 0:
+    fill_color_real = 'rgba(100,116,139,0.04)'
+    fill_color_proj = 'rgba(100,116,139,0.02)'
+else:
+    fill_color_real = 'rgba(22, 101, 52, 0.08)' if real_last >= plan_last else 'rgba(153, 27, 27, 0.08)'
+    fill_color_proj = 'rgba(22, 101, 52, 0.04)' if proj_last >= plan_last else 'rgba(153, 27, 27, 0.04)'
+
+# Plotly Line Chart
+fig_ind = go.Figure()
+
+# Add Shaded Areas first so they are rendered in the background
+fig_ind.add_trace(go.Scatter(
+    x=fill_x, y=fill_y_proj,
+    fill='toself',
+    fillcolor=fill_color_proj,
+    line=dict(color='rgba(0,0,0,0)'),
+    showlegend=False,
+    hoverinfo='skip'
+))
+
+fig_ind.add_trace(go.Scatter(
+    x=fill_x, y=fill_y_real,
+    fill='toself',
+    fillcolor=fill_color_real,
+    line=dict(color='rgba(0,0,0,0)'),
+    showlegend=False,
+    hoverinfo='skip'
+))
+
+# Generate Tooltip Texts
+tooltip_texts = []
+for idx_lbl, lbl in enumerate(x_labels):
+    p_val = y_plan[idx_lbl]
+    r_val = y_real[idx_lbl]
+    pr_val = y_proj[idx_lbl]
+    
+    if r_val is None:
+        tooltip_texts.append("")
+    else:
+        r_pct = ((r_val - p_val)/p_val)*100 if p_val > 0 else 0.0
+        pr_pct = ((pr_val - p_val)/p_val)*100 if p_val > 0 else 0.0
+        
+        r_f = "🟢" if p_val == 0 or (r_val/p_val) >= 1.0 else "🟡" if (r_val/p_val) >= 0.90 else "🔴"
+        pr_f = "🟢" if p_val == 0 or (pr_val/p_val) >= 1.0 else "🟡" if (pr_val/p_val) >= 0.90 else "🔴"
+        
+        tooltip_texts.append(
+            f"Indicador: {sel_indicator}<br>"
+            f"Período: {lbl}<br>"
+            f"Planejado: {chart_fmt(p_val)}<br>"
+            f"Real: {chart_fmt(r_val)}<br>"
+            f"Projeção: {chart_fmt(pr_val)}<br>"
+            f"Real x Planejado: {r_pct:+.1f}% {r_f}<br>"
+            f"Projeção x Planejado: {pr_pct:+.1f}% {pr_f}"
+        )
+
+# Add Lines
+fig_ind.add_trace(go.Scatter(
+    x=x_labels, y=y_plan,
+    name="Planejado",
+    mode='lines+markers',
+    line=dict(color='#002060', width=3),
+    text=tooltip_texts,
+    hovertemplate="%{text}<extra></extra>"
+))
+
+fig_ind.add_trace(go.Scatter(
+    x=x_labels, y=y_real,
+    name="Real",
+    mode='lines+markers',
+    line=dict(color=real_color, width=3),
+    text=tooltip_texts,
+    hovertemplate="%{text}<extra></extra>"
+))
+
+fig_ind.add_trace(go.Scatter(
+    x=x_labels, y=y_proj,
+    name="Projeção pelo Ritmo Atual",
+    mode='lines+markers',
+    line=dict(color='#D97706', width=3, dash='dash'),
+    text=tooltip_texts,
+    hovertemplate="%{text}<extra></extra>"
+))
+
+# Add Status Annotations on the last available point
+last_lbl = x_labels[selected_idx]
+fig_ind.add_annotation(
+    x=last_lbl, y=real_last,
+    text=real_status_label,
+    showarrow=True,
+    arrowhead=1,
+    ax=65, ay=-35,
+    font=dict(size=11, color=real_color, family="sans-serif"),
+    bgcolor="rgba(255,255,255,0.95)",
+    bordercolor=real_color,
+    borderwidth=1,
+    borderpad=4
+)
+
+fig_ind.add_annotation(
+    x=last_lbl, y=proj_last,
+    text=proj_status_label,
+    showarrow=True,
+    arrowhead=1,
+    ax=65, ay=35,
+    font=dict(size=11, color='#D97706', family="sans-serif"),
+    bgcolor="rgba(255,255,255,0.95)",
+    bordercolor='#D97706',
+    borderwidth=1,
+    borderpad=4
+)
+
+# Calculate dynamic axis scale
+all_visible_vals = [v for v in y_plan + [x for x in y_real if x is not None] + [x for x in y_proj if x is not None]]
+if all_visible_vals:
+    ymin = min(all_visible_vals)
+    ymax = max(all_visible_vals)
+    margin = (ymax - ymin) * 0.12
+    if margin == 0:
+        margin = ymax * 0.12 if ymax > 0 else 1.0
+    range_y_axis = [max(0.0, ymin - margin), ymax + margin]
+else:
+    range_y_axis = None
+
+fig_ind.update_layout(
+    height=360,
+    margin=dict(l=10, r=80, t=10, b=10),
+    showlegend=True,
+    legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=1.12,
+        xanchor="center",
+        x=0.5,
+        font=dict(size=11),
+        itemclick="toggle",
+        itemdoubleclick="toggleothers"
+    ),
+    paper_bgcolor='rgba(0,0,0,0)',
+    plot_bgcolor='rgba(0,0,0,0)',
+    xaxis=dict(showgrid=True, gridcolor="#F1F5F9"),
+    yaxis=dict(showgrid=True, gridcolor="#F1F5F9", range=range_y_axis) if range_y_axis else dict(showgrid=True, gridcolor="#F1F5F9")
+)
+
+st.plotly_chart(fig_ind, use_container_width=True)
+st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
 
 # Inform discretely if month has only consolidated monthly data
 if not has_weeks_data:
@@ -763,23 +1163,41 @@ for quad in quadrants_setup:
         # 1. QUADRANT KPI CARD
         quad_c_vals = kpis_values[q_key]
         if quad_c_vals["plan"] == 0:
-            q_gap_str = "Meta não definida"
-            q_farol = "—"
-            q_color = "#64748B"
-        else:
-            q_gap = ((quad_c_vals["actual"] - quad_c_vals["plan"]) / quad_c_vals["plan"]) * 100
-            q_gap_str = f"{q_gap:+.1f}%".replace(".", ",")
+            q_real_pct_str = "- %"
+            q_real_farol = "⚪"
+            q_real_color = "#64748B"
             
-            q_ach = quad_c_vals["proj"] / quad_c_vals["plan"] if "Ano" in viz_mode or "Mês" in viz_mode or not has_weeks_data else quad_c_vals["actual"] / quad_c_vals["plan"]
-            if q_ach >= 0.95:
-                q_farol = "🟢"
-                q_color = "#166534"
-            elif q_ach >= 0.90:
-                q_farol = "🟡"
-                q_color = "#854D0E"
+            q_proj_pct_str = "- %"
+            q_proj_farol = "⚪"
+            q_proj_color = "#64748B"
+        else:
+            q_real_ratio = quad_c_vals["actual"] / quad_c_vals["plan"]
+            q_real_pct = ((quad_c_vals["actual"] - quad_c_vals["plan"]) / quad_c_vals["plan"]) * 100
+            q_real_pct_str = f"{q_real_pct:+.1f}%".replace(".", ",")
+            
+            if q_real_ratio >= 1.0:
+                q_real_farol = "🟢"
+                q_real_color = "#166534"
+            elif q_real_ratio >= 0.90:
+                q_real_farol = "🟡"
+                q_real_color = "#854D0E"
             else:
-                q_farol = "🔴"
-                q_color = "#991B1B"
+                q_real_farol = "🔴"
+                q_real_color = "#991B1B"
+                
+            q_proj_ratio = quad_c_vals["proj"] / quad_c_vals["plan"]
+            q_proj_pct = ((quad_c_vals["proj"] - quad_c_vals["plan"]) / quad_c_vals["plan"]) * 100
+            q_proj_pct_str = f"{q_proj_pct:+.1f}%".replace(".", ",")
+            
+            if q_proj_ratio >= 1.0:
+                q_proj_farol = "🟢"
+                q_proj_color = "#166534"
+            elif q_proj_ratio >= 0.90:
+                q_proj_farol = "🟡"
+                q_proj_color = "#854D0E"
+            else:
+                q_proj_farol = "🔴"
+                q_proj_color = "#991B1B"
                 
         st.markdown(f'''
         <div class="kpi-card" style="margin-bottom:1rem; border-color:#CBD5E1;">
@@ -794,11 +1212,15 @@ for quad in quadrants_setup:
                     <div class="kpi-sub-val">{quad["fmt"](quad_c_vals["proj"])}</div>
                 </div>
             </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.3rem; border-top:1px solid #E2E8F0; padding-top:0.3rem;">
-                <span style="font-size:0.75rem; font-weight:700; color:#475569;">Desvio Real/Plan:</span>
-                <span style="font-size:0.8rem; font-weight:800; color:{q_color};">
-                    {q_gap_str} <span class="kpi-light">{q_farol}</span>
-                </span>
+            <div style="margin-top:0.4rem; border-top:1px solid #E2E8F0; padding-top:0.4rem; font-size:0.75rem; font-weight:700;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.2rem;">
+                    <span style="color:#475569;">Real x Planejado:</span>
+                    <span style="color:{q_real_color}; font-weight:800;">{q_real_pct_str} <span class="kpi-light">{q_real_farol}</span></span>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="color:#475569;">Projeção x Planejado:</span>
+                    <span style="color:{q_proj_color}; font-weight:800;">{q_proj_pct_str} <span class="kpi-light">{q_proj_farol}</span></span>
+                </div>
             </div>
         </div>
         ''', unsafe_allow_html=True)
