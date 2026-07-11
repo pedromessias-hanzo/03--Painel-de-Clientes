@@ -167,7 +167,7 @@ import data_loader
 # If left as placeholder or empty, it will fall back to reading the local "Planejamento 2026.xlsx".
 GOOGLE_DRIVE_FILE_ID = "paste_file_id_here"
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=300)
 def load_and_cache_data():
     try:
         # Check if Google Drive file ID is set
@@ -189,7 +189,6 @@ def load_and_cache_data():
                 content = response.content
                 
             data_bytes = io.BytesIO(content)
-            # Old data format parser
             xl = pd.ExcelFile(data_bytes)
             
             # Retrieve last modified time from response header, fallback to current time
@@ -199,7 +198,6 @@ def load_and_cache_data():
                     last_modified = email.utils.parsedate_to_datetime(response.headers["Last-Modified"])
                 except:
                     pass
-            return xl, last_modified, None
         else:
             # Fallback to local spreadsheet path
             excel_path = os.path.join(os.path.dirname(__file__), "Planejamento 2026.xlsx")
@@ -210,12 +208,21 @@ def load_and_cache_data():
             xl = pd.ExcelFile(excel_path)
             mtime = os.path.getmtime(excel_path)
             last_modified = datetime.datetime.fromtimestamp(mtime)
-            return xl, last_modified, None
+            
+        # Parse all sheets into dict of dataframes to ensure return values are fully serializable for cache_data
+        sheets_data = {}
+        for s in xl.sheet_names:
+            if s in ["Planejamento", "Projeção", "Projeo"]:
+                sheets_data[s] = xl.parse(s, header=None)
+            else:
+                sheets_data[s] = xl.parse(s)
+                
+        return sheets_data, last_modified, None
     except Exception as e:
         return None, None, str(e)
 
-# Load data workbook
-xl, last_modified, load_error = load_and_cache_data()
+# Load data workbook sheets dictionary
+sheets_data, last_modified, load_error = load_and_cache_data()
 
 if load_error:
     st.error(f"Erro ao carregar planilha: {load_error}")
@@ -227,10 +234,10 @@ EN_MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out
 EN_TO_PT = dict(zip(EN_MONTHS, PT_MONTHS))
 
 # Parse monthly data using data_loader
-overview_data, monthly_data, _, clients_metadata = data_loader.load_data(xl)
+overview_data, monthly_data, _, clients_metadata = data_loader.load_data(sheets_data)
 
 # Retrieve active sheet to extract weights row and dynamic columns mapping
-df_pl = xl.parse("Planejamento", header=None)
+df_pl = sheets_data.get("Planejamento")
 m_map_pl = data_loader.map_columns(df_pl)
 has_weekly = any(m_map_pl[m]["weekly"] for m in m_map_pl)
 
@@ -238,9 +245,17 @@ if has_weekly:
     df_active = df_pl
     m_map = m_map_pl
 else:
-    sheet_name = "Projeção" if "Projeção" in xl.sheet_names else "Projeo"
-    df_active = xl.parse(sheet_name, header=None)
-    m_map = data_loader.map_columns(df_active)
+    proj_sheet = None
+    for s in ["Projeção", "Projeo"]:
+        if s in sheets_data:
+            proj_sheet = s
+            break
+    if proj_sheet:
+        df_active = sheets_data[proj_sheet]
+        m_map = data_loader.map_columns(df_active)
+    else:
+        df_active = df_pl
+        m_map = m_map_pl
 
 # 1. AUTOMATIC MONTH & WEEK DETECTION
 latest_weekly_month = None
